@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using NUnit.Framework;
 using UnityEngine;
 
 public struct Spline
@@ -54,6 +53,51 @@ public class SplineManager : MonoBehaviour
         return splines[splineIndex];
     }
 
+    public Vector3 ComputeTangent(int splineIndex, float t)
+    {
+        Spline spline = splines[splineIndex];
+        List<Vector3> points = spline.points;
+
+        Vector3 implicitStart = points[0] + points[1] - points[0];
+        Vector3 implicitEnd = points[^1] + points[^2] - points[^1];
+
+        int segmentCount = points.Count - 1;
+        float scaledT = t * segmentCount;
+        int segmentIndex = Mathf.Min(Mathf.FloorToInt(scaledT), segmentCount - 1);
+        float localT = scaledT - segmentIndex;
+
+        Vector3 p0 = segmentIndex == 0 ? implicitStart : points[segmentIndex - 1];
+        Vector3 p1 = points[segmentIndex];
+        Vector3 p2 = points[segmentIndex + 1];
+        Vector3 p3 = segmentIndex + 2 < points.Count ? points[segmentIndex + 2] : implicitEnd;
+
+        return ComputeTangentOnSegment(p0, p1, p2, p3, localT).normalized;
+    }
+
+    public Vector3 ComputeNormal(int splineIndex, float t)
+    {
+        Vector3 tangent = ComputeTangent(splineIndex, t);
+        return Vector3.Cross(tangent, Vector3.up).normalized;
+    }
+
+    public Vector3 ComputeLocalUp(int splineIndex, float t)
+    {
+        Vector3 tangent = ComputeTangent(splineIndex, t);
+        Vector3 normal = Vector3.Cross(tangent, Vector3.up).normalized;
+        return Vector3.Cross(normal, tangent).normalized;
+    }
+
+    public Vector3[] SamplePoints(int splineIndex, int sampleCount)
+    {
+        Vector3[] samples = new Vector3[sampleCount];
+        for (int i = 0; i < sampleCount; i++)
+        {
+            float t = i / (float)(sampleCount - 1);
+            samples[i] = ComputePoint(splineIndex, t);
+        }
+        return samples;
+    }
+
     public Vector3 ComputePoint(int splineIndex, float t)
     {
         Spline spline = splines[splineIndex];
@@ -75,17 +119,6 @@ public class SplineManager : MonoBehaviour
         return ComputeOnSegment(p0, p1, p2, p3, localT);
     }
 
-    public Vector3[] SamplePoints(int splineIndex, int sampleCount)
-    {
-        Vector3[] samples = new Vector3[sampleCount];
-        for (int i = 0; i < sampleCount; i++)
-        {
-            float t = i / (float)(sampleCount - 1);
-            samples[i] = ComputePoint(splineIndex, t);
-        }
-        return samples;
-    }
-
     private Vector3 ComputeOnSegment(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float localT)
     {
         float t2 = localT * localT;
@@ -94,5 +127,13 @@ public class SplineManager : MonoBehaviour
                        (-p0 + p2) * localT +
                        (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 +
                        (-p0 + 3f * p1 - 3f * p2 + p3) * t3);
+    }
+
+    private Vector3 ComputeTangentOnSegment(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float localT)
+    {
+        float t2 = localT * localT;
+        return 0.5f * ((-p0 + p2) +
+                       2f * (2f * p0 - 5f * p1 + 4f * p2 - p3) * localT +
+                       3f * (-p0 + 3f * p1 - 3f * p2 + p3) * t2);
     }
 }
