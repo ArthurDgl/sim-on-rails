@@ -87,6 +87,82 @@ public class SplineManager : MonoBehaviour
         return Vector3.Cross(normal, tangent).normalized;
     }
 
+    public float StepDistanceApprox(int splineIndex, float t, float distance)
+    {
+        Spline spline = splines[splineIndex];
+        List<Vector3> points = spline.points;
+
+        int segmentCount = points.Count - 1;
+        float scaledT = t * segmentCount;
+        int segmentIndex = Mathf.Min(Mathf.FloorToInt(scaledT), segmentCount - 1);
+
+        float approximatedSegmentLength = (points[segmentIndex + 1] - points[segmentIndex]).magnitude;
+
+        float localStepT = distance / approximatedSegmentLength;
+        float globalStepT = localStepT / segmentCount;
+
+        return globalStepT;
+    }
+
+    public (Vector3, float) GridSearch(int splineIndex, float t, float distance, float start, float end, int resolution)
+    {
+        float accumulatedDistance = 0f;
+
+        float stepT = start;
+        Vector3 previousPoint = ComputePoint(splineIndex, t);
+        for (int i = 0; i < resolution; i++)
+        {
+            float tStep = start + (end - start) * (i / (float)(resolution - 1));
+            Vector3 currentPoint = ComputePoint(splineIndex, t + tStep);
+            accumulatedDistance += (currentPoint - previousPoint).magnitude;
+            previousPoint = currentPoint;
+            if (accumulatedDistance >= distance)
+            {
+                return (currentPoint, tStep);
+            }
+        }
+        return (ComputePoint(splineIndex, t + end), end);
+    }
+
+    public (Vector3, float) BinarySearch(int splineIndex, float t, float distance, float start, float end, int resolution)
+    {
+        for (int i = 0; i < resolution; i++)
+        {
+            float mid = (start + end) / 2f;
+            Vector3 point = ComputePoint(splineIndex, t + mid);
+            float accumulatedDistance = (point - ComputePoint(splineIndex, t)).magnitude;
+            if (accumulatedDistance < distance)
+            {
+                start = mid;
+            }
+            else
+            {
+                end = mid;
+            }
+        }
+
+        float resultStep = (start + end) / 2f;
+
+        return (ComputePoint(splineIndex, t + resultStep), resultStep);
+    }
+
+    public (Vector3, float) StepDistance(int splineIndex, float t, float distance, int resolution = 10, bool useDichotomy = true)
+    {
+        float globalStepT = StepDistanceApprox(splineIndex, t, distance);
+        
+        float start = globalStepT * 0.6f;
+        float end = globalStepT * 1.4f;
+
+        if (useDichotomy)
+        {
+            return BinarySearch(splineIndex, t, distance, start, end, resolution);
+        }
+        else
+        {
+            return GridSearch(splineIndex, t, distance, start, end, resolution);
+        }
+    }
+
     public Vector3[] SamplePoints(int splineIndex, int sampleCount)
     {
         Vector3[] samples = new Vector3[sampleCount];
@@ -103,8 +179,8 @@ public class SplineManager : MonoBehaviour
         Spline spline = splines[splineIndex];
         List<Vector3> points = spline.points;
 
-        Vector3 implicitStart = points[0] + points[1] - points[0];
-        Vector3 implicitEnd = points[^1] + points[^2] - points[^1];
+        Vector3 implicitStart = 2f * points[0] - points[1];
+        Vector3 implicitEnd = 2f * points[^1] - points[^2];
 
         int segmentCount = points.Count - 1;
         float scaledT = t * segmentCount;

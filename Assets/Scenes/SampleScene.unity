@@ -440,8 +440,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ba78437d5912fe11abb5cfc6a8bdd405, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SplineTests
+  splineManager: {fileID: 0}
   splinePoints: 6
   resolution: 100
+  hideOtherTests: 1
+  currentT: 0
+  autoPlay: 0
+  distanceTests: 1000
+  minDistance: 0.001
+  maxDistance: 0.1
+  stepDistance: 0.01
+  stepResolution: 10
+  useDichotomy: 0
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -491,6 +501,56 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1194421469
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1194421470}
+  - component: {fileID: 1194421471}
+  m_Layer: 0
+  m_Name: TestTrain
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1194421470
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1194421469}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1194421471
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1194421469}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dfcd33b4b9c57e5e18ad81fd2eeed7cc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Train
+  splineManager: {fileID: 413440687}
+  attached: 0
+  attachedTo: 0
+  currentT: 0
+  mass: 1
+  damping: 0.01
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -499,3 +559,4 @@ SceneRoots:
   - {fileID: 410087041}
   - {fileID: 832575519}
   - {fileID: 413440688}
+  - {fileID: 1194421470}
