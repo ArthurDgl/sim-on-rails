@@ -1,0 +1,26 @@
+
+# Default: normalize text files to LF
+* text=auto eol=lf
+
+# Unity-specific text files
+*.cs text eol=lf
+*.shader text eol=lf
+*.compute text eol=lf
+*.cginc text eol=lf
+*.hlsl text eol=lf
+*.glsl text eol=lf
+*.json text eol=lf
+*.asmdef text eol=lf
+*.asmref text eol=lf
+*.meta text eol=lf
+*.unity text eol=lf
+*.prefab text eol=lf
+*.asset text eol=lf
+*.mat text eol=lf
+*.controller text eol=lf
+*.anim text eol=lf
+*.physicMaterial text eol=lf
+*.renderTexture text eol=lf
+*.lighting text eol=lf
+*.guiskin text eol=lf
+*.spriteatlas text eol=lf
