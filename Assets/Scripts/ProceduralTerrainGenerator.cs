@@ -1,3 +1,6 @@
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 using UnityEngine;
 
@@ -120,3 +123,20 @@ public class ProceduralTerrainGenerator : MonoBehaviour
         data.SetHeights(0, 0, heights);
     }
 }
+
+#if UNITY_EDITOR
+[CustomEditor(typeof(ProceduralTerrainGenerator))]
+public class ProceduralTerrainGeneratorEditor : Editor
+{
+    public override void OnInspectorGUI()
+    {
+        DrawDefaultInspector();
+
+        ProceduralTerrainGenerator generator = (ProceduralTerrainGenerator)target;
+        if (GUILayout.Button("Generate Terrain"))
+        {
+            generator.GenerateTerrain();
+        }
+    }
+}
+#endif
