@@ -10,9 +10,9 @@ public class Train : MonoBehaviour
 
     public float currentT = 0f;
 
-    private float velocity = 0f;
+    public float velocity = 0f;
 
-    private float acceleration = 0f;
+    public float acceleration = 0f;
 
     public float mass = 1f;
 
@@ -42,16 +42,35 @@ public class Train : MonoBehaviour
         if (splineManager == null) return;
         if (!attached) return;
 
+        if (currentT < 0f || currentT > 1f)
+        {
+            currentT = Mathf.Clamp01(currentT);
+        }
+
         ApplyForce(new Vector3(0f, -9.81f * mass, 0f));
 
         velocity += acceleration * Time.fixedDeltaTime;
-        velocity *= 1f - damping;
+        velocity *= Mathf.Exp(-damping * Time.fixedDeltaTime);
 
         (Vector3 newPosition, float stepT) = splineManager.StepDistance(attachedTo, currentT, velocity * Time.fixedDeltaTime);
 
         currentT += stepT;
         transform.position = newPosition;
         acceleration = 0f;
+    }
+
+    void OnDrawGizmos()
+    {
+        // Gizmos.color = Color.red;
+        // Gizmos.DrawLine(transform.position, transform.position + shownForce);
+
+        // Show velocity along the tangent
+        if (splineManager != null && attached)
+        {
+            Gizmos.color = Color.blue;
+            Vector3 tangent = splineManager.ComputeTangent(attachedTo, currentT);
+            Gizmos.DrawLine(transform.position, transform.position + tangent * velocity);
+        }
     }
 
     public void ApplyForce(Vector3 force)

@@ -58,8 +58,8 @@ public class SplineManager : MonoBehaviour
         Spline spline = splines[splineIndex];
         List<Vector3> points = spline.points;
 
-        Vector3 implicitStart = points[0] + points[1] - points[0];
-        Vector3 implicitEnd = points[^1] + points[^2] - points[^1];
+        Vector3 implicitStart = 2f * points[0] - points[1];
+        Vector3 implicitEnd = 2f * points[^1] - points[^2];
 
         int segmentCount = points.Count - 1;
         float scaledT = t * segmentCount;
@@ -124,26 +124,55 @@ public class SplineManager : MonoBehaviour
         return (ComputePoint(splineIndex, t + end), end);
     }
 
-    public (Vector3, float) BinarySearch(int splineIndex, float t, float distance, float start, float end, int resolution)
+    public (Vector3, float) BinarySearch(
+        int splineIndex,
+        float t,
+        float distance,
+        float start,
+        float end,
+        int resolution)
     {
-        for (int i = 0; i < resolution; i++)
+        float targetDistance = Mathf.Abs(distance);
+        float direction = Mathf.Sign(distance);
+
+        if (targetDistance < 0.000001f)
+            return (ComputePoint(splineIndex, t), 0f);
+
+        // Search only positive step magnitudes.
+        float low = 0f;
+        float high = Mathf.Max(Mathf.Abs(start), Mathf.Abs(end));
+
+        // Find the approximate arc length of a parameter step.
+        float ArcLength(float deltaT)
         {
-            float mid = (start + end) / 2f;
-            Vector3 point = ComputePoint(splineIndex, t + mid);
-            float accumulatedDistance = (point - ComputePoint(splineIndex, t)).magnitude;
-            if (accumulatedDistance < distance)
+            float length = 0f;
+            Vector3 previous = ComputePoint(splineIndex, t);
+
+            for (int i = 1; i <= resolution; i++)
             {
-                start = mid;
+                float sampleT = t + direction * deltaT
+                    * (i / (float)resolution);
+
+                Vector3 current = ComputePoint(splineIndex, sampleT);
+                length += Vector3.Distance(previous, current);
+                previous = current;
             }
-            else
-            {
-                end = mid;
-            }
+
+            return length;
         }
 
-        float resultStep = (start + end) / 2f;
+        for (int i = 0; i < 20; i++)
+        {
+            float mid = (low + high) * 0.5f;
 
-        return (ComputePoint(splineIndex, t + resultStep), resultStep);
+            if (ArcLength(mid) < targetDistance)
+                low = mid;
+            else
+                high = mid;
+        }
+
+        float stepT = direction * (low + high) * 0.5f;
+        return (ComputePoint(splineIndex, t + stepT), stepT);
     }
 
     public (Vector3, float) StepDistance(int splineIndex, float t, float distance, int resolution = 10, bool useDichotomy = true)
