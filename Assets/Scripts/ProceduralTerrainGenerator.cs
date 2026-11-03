@@ -2,7 +2,28 @@
 using UnityEditor;
 #endif
 
+using System;
+using System.Collections.Generic;
 using UnityEngine;
+
+[Serializable]
+public class Biome
+{
+    public string name = "Biome";
+
+    [Header("Climate (where this biome appears)")]
+    [Range(0f, 1f)] public float temperature = 0.5f; // 0 = cold, 1 = hot
+    [Range(0f, 1f)] public float moisture = 0.5f;    // 0 = dry,  1 = wet
+
+    [Header("Shape")]
+    [Range(0f, 1f)] public float baseHeight = 0.2f;       // average elevation
+    [Range(0f, 1f)] public float heightVariation = 0.3f;  // how bumpy
+    [Range(0.1f, 0.9f)] public float persistence = 0.5f;  // roughness
+    [Range(0f, 1f)] public float mountainInfluence = 0f;  // 0 = flat-ish, 1 = mountains allowed
+
+    [Header("Look")]
+    public TerrainLayer layer; // texture painted for this biome (optional)
+}
 
 [RequireComponent(typeof(Terrain))]
 public class ProceduralTerrainGenerator : MonoBehaviour
@@ -24,9 +45,6 @@ public class ProceduralTerrainGenerator : MonoBehaviour
     [Range(1, 8)]
     public int octaves = 5;
 
-    [Range(0.1f, 0.9f)]
-    public float persistence = 0.5f;
-
     [Range(1.5f, 3f)]
     public float lacunarity = 2f;
 
@@ -35,6 +53,28 @@ public class ProceduralTerrainGenerator : MonoBehaviour
     public float mountainStrength = 0.65f;
 
     public float mountainScale = 0.003f;
+
+    [Header("Biomes")]
+    [Tooltip("Size of biome regions. Smaller = bigger biomes.")]
+    [Min(0.0001f)]
+    public float climateScale = 0.0025f;
+
+    [Tooltip("Pushes climate values toward the extremes so all biomes appear.")]
+    [Range(1f, 4f)]
+    public float climateContrast = 2f;
+
+    [Tooltip("Higher = sharper borders between biomes, lower = softer blending.")]
+    [Range(1f, 12f)]
+    public float blendSharpness = 4f;
+
+    public List<Biome> biomes = new List<Biome>
+    {
+        new Biome { name = "Desert",    temperature = 0.9f, moisture = 0.1f, baseHeight = 0.12f, heightVariation = 0.10f, persistence = 0.40f, mountainInfluence = 0.1f },
+        new Biome { name = "Plains",    temperature = 0.6f, moisture = 0.4f, baseHeight = 0.18f, heightVariation = 0.12f, persistence = 0.45f, mountainInfluence = 0.2f },
+        new Biome { name = "Forest",    temperature = 0.5f, moisture = 0.8f, baseHeight = 0.22f, heightVariation = 0.25f, persistence = 0.50f, mountainInfluence = 0.4f },
+        new Biome { name = "Tundra",    temperature = 0.1f, moisture = 0.3f, baseHeight = 0.25f, heightVariation = 0.20f, persistence = 0.50f, mountainInfluence = 0.7f },
+        new Biome { name = "Highlands", temperature = 0.2f, moisture = 0.8f, baseHeight = 0.30f, heightVariation = 0.35f, persistence = 0.55f, mountainInfluence = 1.0f },
+    };
 
     private Terrain terrain;
 
@@ -50,6 +90,12 @@ public class ProceduralTerrainGenerator : MonoBehaviour
         if (terrain == null)
             terrain = GetComponent<Terrain>();
 
+        if (biomes == null || biomes.Count == 0)
+        {
+            Debug.LogWarning("ProceduralTerrainGenerator: add at least one biome.");
+            return;
+        }
+
         TerrainData data = terrain.terrainData;
 
         data.heightmapResolution = Mathf.ClosestPowerOfTwo(
@@ -62,9 +108,15 @@ public class ProceduralTerrainGenerator : MonoBehaviour
         float[,] heights = new float[resolution, resolution];
 
         System.Random random = new System.Random(seed);
-
         float offsetX = (float)random.NextDouble() * 10000f;
         float offsetZ = (float)random.NextDouble() * 10000f;
+        // Separate offsets so temperature / moisture / mountains are independent
+        float tempOffX = (float)random.NextDouble() * 10000f;
+        float tempOffZ = (float)random.NextDouble() * 10000f;
+        float moistOffX = (float)random.NextDouble() * 10000f;
+        float moistOffZ = (float)random.NextDouble() * 10000f;
+
+        float[] weights = new float[biomes.Count];
 
         for (int z = 0; z < resolution; z++)
         {
@@ -72,55 +124,126 @@ public class ProceduralTerrainGenerator : MonoBehaviour
             {
                 float nx = (float)x / (resolution - 1);
                 float nz = (float)z / (resolution - 1);
+                float worldX = nx * mapWidth;
+                float worldZ = nz * mapLength;
 
-                // Large-scale hills
-                float amplitude = 1f;
-                float frequency = 1f;
-                float noiseHeight = 0f;
-                float amplitudeSum = 0f;
+                ComputeBiomeWeights(worldX, worldZ,
+                    tempOffX, tempOffZ, moistOffX, moistOffZ, weights);
 
-                for (int i = 0; i < octaves; i++)
-                {
-                    float sampleX =
-                        (x + offsetX) * noiseScale * frequency;
-                    float sampleZ =
-                        (z + offsetZ) * noiseScale * frequency;
-
-                    float noise = Mathf.PerlinNoise(sampleX, sampleZ);
-
-                    noiseHeight += noise * amplitude;
-                    amplitudeSum += amplitude;
-
-                    amplitude *= persistence;
-                    frequency *= lacunarity;
-                }
-
-                noiseHeight /= amplitudeSum;
-
-                // Large mountain regions
                 float mountainNoise = Mathf.PerlinNoise(
-                    (nx * mapWidth + offsetX) * mountainScale,
-                    (nz * mapLength + offsetZ) * mountainScale
+                    (worldX + offsetX) * mountainScale,
+                    (worldZ + offsetZ) * mountainScale
                 );
+                float mountains = Mathf.SmoothStep(0.35f, 0.8f, mountainNoise);
 
-                // Emphasize the high parts to create mountains
-                float mountains = Mathf.SmoothStep(
-                    0.35f, 0.8f, mountainNoise
-                );
+                float height = 0f;
 
-                float height = Mathf.Lerp(
-                    noiseHeight * 0.25f,
-                    noiseHeight,
-                    1f - mountainStrength
-                );
+                for (int b = 0; b < biomes.Count; b++)
+                {
+                    if (weights[b] <= 0.0001f) continue;
 
-                height += mountains * mountainStrength * 0.65f;
+                    Biome biome = biomes[b];
+
+                    float n = Fbm(worldX + offsetX, worldZ + offsetZ,
+                        noiseScale, octaves, biome.persistence, lacunarity);
+
+                    float h = biome.baseHeight
+                              + (n - 0.5f) * 2f * biome.heightVariation
+                              + mountains * mountainStrength * 0.65f * biome.mountainInfluence;
+
+                    height += h * weights[b]; // blend heights across biome borders
+                }
 
                 heights[z, x] = Mathf.Clamp01(height);
             }
         }
 
         data.SetHeights(0, 0, heights);
+
+        PaintBiomes(data, tempOffX, tempOffZ, moistOffX, moistOffZ);
+    }
+
+    // ---------- Biomes ----------
+
+    void ComputeBiomeWeights(float worldX, float worldZ,
+        float tOffX, float tOffZ, float mOffX, float mOffZ, float[] weights)
+    {
+        float temperature = Climate(worldX + tOffX, worldZ + tOffZ);
+        float moisture = Climate(worldX + mOffX, worldZ + mOffZ);
+
+        float sum = 0f;
+        for (int i = 0; i < biomes.Count; i++)
+        {
+            float dt = temperature - biomes[i].temperature;
+            float dm = moisture - biomes[i].moisture;
+            float dist = Mathf.Sqrt(dt * dt + dm * dm);
+
+            // Closer in climate space = heavier weight
+            float w = Mathf.Pow(1f / (dist + 0.02f), blendSharpness);
+            weights[i] = w;
+            sum += w;
+        }
+
+        for (int i = 0; i < weights.Length; i++)
+            weights[i] /= sum;
+    }
+
+    float Climate(float x, float z)
+    {
+        float v = Fbm(x, z, climateScale, 3, 0.5f, 2f);
+        // Perlin clusters around 0.5, so stretch it to reach 0 and 1
+        return Mathf.Clamp01((v - 0.5f) * climateContrast + 0.5f);
+    }
+
+    void PaintBiomes(TerrainData data,
+        float tOffX, float tOffZ, float mOffX, float mOffZ)
+    {
+        // Only paint if every biome has a texture assigned
+        TerrainLayer[] layers = new TerrainLayer[biomes.Count];
+        for (int i = 0; i < biomes.Count; i++)
+        {
+            if (biomes[i].layer == null) return;
+            layers[i] = biomes[i].layer;
+        }
+
+        data.terrainLayers = layers;
+
+        int ar = data.alphamapResolution;
+        float[,,] maps = new float[ar, ar, biomes.Count];
+        float[] weights = new float[biomes.Count];
+
+        for (int z = 0; z < ar; z++)
+        {
+            for (int x = 0; x < ar; x++)
+            {
+                float worldX = (float)x / (ar - 1) * mapWidth;
+                float worldZ = (float)z / (ar - 1) * mapLength;
+
+                ComputeBiomeWeights(worldX, worldZ, tOffX, tOffZ, mOffX, mOffZ, weights);
+
+                for (int b = 0; b < biomes.Count; b++)
+                    maps[z, x, b] = weights[b];
+            }
+        }
+
+        data.SetAlphamaps(0, 0, maps);
+    }
+
+    // ---------- Noise helper ----------
+
+    static float Fbm(float x, float z, float scale, int octaves, float persistence, float lacunarity)
+    {
+        float amplitude = 1f, frequency = 1f, value = 0f, sum = 0f;
+
+        for (int i = 0; i < octaves; i++)
+        {
+            value += Mathf.PerlinNoise(x * scale * frequency, z * scale * frequency) * amplitude;
+            sum += amplitude;
+            amplitude *= persistence;
+            frequency *= lacunarity;
+        }
+
+        return value / sum;
     }
 }
 
