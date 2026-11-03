@@ -15,6 +15,8 @@ public class SplineTests : MonoBehaviour
 
     public bool hideOtherTests = true;
 
+    public float scale = 100f;
+
     [Range(0f, 1f)]
     public float currentT = 0f;
 
@@ -104,8 +106,8 @@ public class SplineTests : MonoBehaviour
         Vector3 expectedStepPoint = point + tangent.normalized * stepDistance;
         Gizmos.DrawSphere(expectedStepPoint, 0.03f);
         Gizmos.color = Color.cyan;
-        (Vector3 stepPoint, float stepT) = splineManager.StepDistance(0, currentT, stepDistance, stepResolution, useDichotomy);
-        Gizmos.DrawSphere(stepPoint, 0.03f);
+        StepResult step = splineManager.StepDistance(0, currentT, stepDistance, stepResolution, useDichotomy);
+        Gizmos.DrawSphere(step.position, 0.03f);
     }
 
     public void RandomSpline()
@@ -114,7 +116,7 @@ public class SplineTests : MonoBehaviour
         Vector3[] points = new Vector3[splinePoints];
         for (int i = 0; i < splinePoints; i++)
         {
-            points[i] = new Vector3(Random.value * 2f - 1f, Random.value * 0.2f, Random.value * 2f - 1f);
+            points[i] = new Vector3(Random.value * 2f - 1f, Random.value * 0.2f, Random.value * 2f - 1f) * scale;
         }
         splineManager.FromPoints(points);
     }
@@ -123,10 +125,26 @@ public class SplineTests : MonoBehaviour
     {
         splineManager.ClearSplines();
         Vector3[] points = new Vector3[3];
-        points[0] = new Vector3(-1f, 1f, 0f);
-        points[1] = new Vector3(0f, 0f, 0f);
-        points[2] = new Vector3(1f, 1f, 0f);
+        points[0] = new Vector3(-1f, 1f, 0f) * scale;
+        points[1] = new Vector3(0f, 0f, 0f) * scale;
+        points[2] = new Vector3(1f, 1f, 0f) * scale;
         splineManager.FromPoints(points);
+    }
+
+    public void CreateTestTrack()
+    {
+        splineManager.ClearSplines();
+        Vector3[] points = new Vector3[9];
+        points[0] = new Vector3(0f, 0f, 1f) * scale;
+        points[1] = new Vector3(1f, 0f, 1f) * scale;
+        points[2] = new Vector3(2f, 0f, 0f) * scale;
+        points[3] = new Vector3(1f, 0f, -1f) * scale;
+        points[4] = new Vector3(0f, 0.2f, -1f) * scale;
+        points[5] = new Vector3(-1f, 0f, -1f) * scale;
+        points[6] = new Vector3(-2f, 0f, 0f) * scale;
+        points[7] = new Vector3(-1f, 0f, 1f) * scale;
+        points[8] = new Vector3(0f, 0f, 1f) * scale;
+        splineManager.FromPoints(points, 0, 0, true);
     }
 
     public void TestStepDistance()
@@ -141,9 +159,9 @@ public class SplineTests : MonoBehaviour
         {
             float distance = Random.Range(minDistance, maxDistance);
             Vector3 point = splineManager.ComputePoint(0, currentT);
-            (Vector3 steppedPoint, float stepT) = splineManager.StepDistance(0, currentT, distance, stepResolution, useDichotomy);
+            StepResult step = splineManager.StepDistance(0, currentT, distance, stepResolution, useDichotomy);
             requested[i] = distance;
-            actual[i] = (steppedPoint - point).magnitude;
+            actual[i] = (step.position - point).magnitude;
             errors[i] = Mathf.Abs(requested[i] - actual[i]) / distance;
             minError = Mathf.Min(minError, errors[i]);
             maxError = Mathf.Max(maxError, errors[i]);
@@ -175,6 +193,11 @@ public class SplineTestsEditor : Editor
         if (GUILayout.Button("Create 101 Spline"))
         {
             splineTests.Create101Spline();
+        }
+
+        if (GUILayout.Button("Create Test Track"))
+        {
+            splineTests.CreateTestTrack();
         }
 
         if (GUILayout.Button("Test Step Distance"))

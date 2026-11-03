@@ -444,6 +444,7 @@ MonoBehaviour:
   splinePoints: 6
   resolution: 100
   hideOtherTests: 1
+  scale: 100
   currentT: 0
   autoPlay: 0
   distanceTests: 1000
@@ -549,8 +550,14 @@ MonoBehaviour:
   attached: 0
   attachedTo: 0
   currentT: 0
-  mass: 1
-  damping: 0.01
+  velocity: 0
+  acceleration: 0
+  mass: 1000
+  damping: 0.05
+  throttle: 0
+  maxThrottle: 1000
+  brake: 0
+  maxBrake: 5000
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

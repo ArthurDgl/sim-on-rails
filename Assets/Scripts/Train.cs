@@ -14,9 +14,19 @@ public class Train : MonoBehaviour
 
     public float acceleration = 0f;
 
-    public float mass = 1f;
+    public float mass = 1000f;
 
-    public float damping = 0.01f;
+    public float damping = 0.05f;
+
+    [Range(0f, 1f)]
+    public float throttle = 0f;
+
+    public float maxThrottle = 1000f;
+    
+    [Range(0f, 1f)]
+    public float brake = 0f;
+
+    public float maxBrake = 5000f;
 
     void Awake()
     {
@@ -42,40 +52,78 @@ public class Train : MonoBehaviour
         if (splineManager == null) return;
         if (!attached) return;
 
-        if (currentT < 0f || currentT > 1f)
-        {
-            currentT = Mathf.Clamp01(currentT);
-        }
-
-        ApplyForce(new Vector3(0f, -9.81f * mass, 0f));
+        ApplyForces();
 
         velocity += acceleration * Time.fixedDeltaTime;
         velocity *= Mathf.Exp(-damping * Time.fixedDeltaTime);
 
-        (Vector3 newPosition, float stepT) = splineManager.StepDistance(attachedTo, currentT, velocity * Time.fixedDeltaTime);
+        StepResult step = splineManager.StepDistance(attachedTo, currentT, velocity * Time.fixedDeltaTime);
 
-        currentT += stepT;
-        transform.position = newPosition;
+        currentT = step.newT;
+        transform.position = step.position;
+        if (step.reachedEnd)
+        {
+            if (step.newSplineIndex >= 0)
+            {
+                attachedTo = step.newSplineIndex;
+            }
+            else
+            {
+                velocity = 0f;
+            }
+        }
         acceleration = 0f;
     }
 
     void OnDrawGizmos()
     {
+        // show position of the train
+        Gizmos.color = Color.blue;
+        Gizmos.DrawWireSphere(transform.position, 2f);
+
         // Gizmos.color = Color.red;
         // Gizmos.DrawLine(transform.position, transform.position + shownForce);
 
         // Show velocity along the tangent
-        if (splineManager != null && attached)
-        {
-            Gizmos.color = Color.blue;
-            Vector3 tangent = splineManager.ComputeTangent(attachedTo, currentT);
-            Gizmos.DrawLine(transform.position, transform.position + tangent * velocity);
-        }
+        // if (splineManager != null && attached)
+        // {
+        //     Gizmos.color = Color.blue;
+        //     Vector3 tangent = splineManager.ComputeTangent(attachedTo, currentT);
+        //     Gizmos.DrawLine(transform.position, transform.position + tangent * velocity);
+        // }
     }
 
-    public void ApplyForce(Vector3 force)
+    public virtual float GetEffectiveMass()
     {
-        Vector3 tangent = splineManager.ComputeTangent(attachedTo, currentT);
-        acceleration += Vector3.Dot(force, tangent) / mass;
+        return mass;
+    }
+
+    public void ApplyForce(Vector3 force, int splineIndex, float t)
+    {
+        Vector3 tangent = splineManager.ComputeTangent(splineIndex, t);
+        acceleration += Vector3.Dot(force, tangent) / GetEffectiveMass();
+    }
+
+    public void ApplyGravity(int splineIndex, float t)
+    {
+        ApplyForce(new Vector3(0f, -9.81f * mass, 0f), splineIndex, t);
+    }
+
+    public void ApplyThrottle(int splineIndex, float t) {
+        Vector3 tangent = splineManager.ComputeTangent(splineIndex, t);
+        float force = throttle * maxThrottle;
+        ApplyForce(tangent * force, splineIndex, t);
+    }
+
+    public void ApplyBrake(int splineIndex, float t) {
+        Vector3 tangent = splineManager.ComputeTangent(splineIndex, t);
+        float force = velocity * brake * maxBrake;
+        ApplyForce(-tangent * force, splineIndex, t);
+    }
+    public virtual void ApplyForces()
+    {
+        ApplyGravity(attachedTo, currentT);
+        ApplyThrottle(attachedTo, currentT);
+        ApplyBrake(attachedTo, currentT);
     }
 }
