@@ -556,10 +556,53 @@ MonoBehaviour:
   seed: 42
   noiseScale: 0.008
   octaves: 5
-  persistence: 0.5
   lacunarity: 2
   mountainStrength: 0.65
   mountainScale: 0.003
+  climateScale: 0.0035
+  climateContrast: 2
+  blendSharpness: 4
+  biomes:
+  - name: Desert
+    temperature: 0.9
+    moisture: 0.1
+    baseHeight: 0.12
+    heightVariation: 0.1
+    persistence: 0.4
+    mountainInfluence: 0.1
+    layer: {fileID: 8574412962073106934, guid: 1ded3ba1c5a90054e8f23ddfa62fb2b7, type: 2}
+  - name: Plains
+    temperature: 0.6
+    moisture: 0.4
+    baseHeight: 0.18
+    heightVariation: 0.12
+    persistence: 0.45
+    mountainInfluence: 0.2
+    layer: {fileID: 8574412962073106934, guid: 0cbb01b61ed524a48a119d81aa262fed, type: 2}
+  - name: Forest
+    temperature: 0.5
+    moisture: 0.8
+    baseHeight: 0.22
+    heightVariation: 0.25
+    persistence: 0.5
+    mountainInfluence: 0.4
+    layer: {fileID: 8574412962073106934, guid: d25c8def728088547ae6a1024dd9b481, type: 2}
+  - name: Tundra
+    temperature: 0.1
+    moisture: 0.3
+    baseHeight: 0.25
+    heightVariation: 0.2
+    persistence: 0.5
+    mountainInfluence: 0.7
+    layer: {fileID: 8574412962073106934, guid: 62f82665abc6fbf4e8f7fa058cbd8d6c, type: 2}
+  - name: Highlands
+    temperature: 0.2
+    moisture: 0.8
+    baseHeight: 0.3
+    heightVariation: 0.35
+    persistence: 0.55
+    mountainInfluence: 1
+    layer: {fileID: 8574412962073106934, guid: 59b98ca43f27d8c4a89d4058d2a962e5, type: 2}
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
