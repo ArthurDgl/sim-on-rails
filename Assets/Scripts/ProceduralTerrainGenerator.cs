@@ -198,18 +198,44 @@ public class ProceduralTerrainGenerator : MonoBehaviour
     void PaintBiomes(TerrainData data,
         float tOffX, float tOffZ, float mOffX, float mOffZ)
     {
-        // Only paint if every biome has a texture assigned
-        TerrainLayer[] layers = new TerrainLayer[biomes.Count];
+        // Collect the distinct layers assigned to biomes
+        List<TerrainLayer> layerList = new List<TerrainLayer>();
+        int[] layerIndex = new int[biomes.Count];
+
         for (int i = 0; i < biomes.Count; i++)
         {
-            if (biomes[i].layer == null) return;
-            layers[i] = biomes[i].layer;
+            layerIndex[i] = -1;
+            if (biomes[i].layer == null) continue;
+
+            int idx = layerList.IndexOf(biomes[i].layer);
+            if (idx < 0)
+            {
+                layerList.Add(biomes[i].layer);
+                idx = layerList.Count - 1;
+            }
+            layerIndex[i] = idx;
         }
 
-        data.terrainLayers = layers;
+        if (layerList.Count == 0)
+        {
+            Debug.LogWarning("ProceduralTerrainGenerator: no Terrain Layer assigned to any biome (Biomes > Layer), so nothing was painted.");
+            return;
+        }
+
+        // Biomes without a layer fall back to the first assigned layer
+        for (int i = 0; i < biomes.Count; i++)
+        {
+            if (layerIndex[i] < 0)
+            {
+                layerIndex[i] = 0;
+                Debug.LogWarning($"ProceduralTerrainGenerator: biome '{biomes[i].name}' has no Terrain Layer, using '{layerList[0].name}' instead.");
+            }
+        }
+
+        data.terrainLayers = layerList.ToArray();
 
         int ar = data.alphamapResolution;
-        float[,,] maps = new float[ar, ar, biomes.Count];
+        float[,,] maps = new float[ar, ar, layerList.Count];
         float[] weights = new float[biomes.Count];
 
         for (int z = 0; z < ar; z++)
@@ -222,7 +248,7 @@ public class ProceduralTerrainGenerator : MonoBehaviour
                 ComputeBiomeWeights(worldX, worldZ, tOffX, tOffZ, mOffX, mOffZ, weights);
 
                 for (int b = 0; b < biomes.Count; b++)
-                    maps[z, x, b] = weights[b];
+                    maps[z, x, layerIndex[b]] += weights[b];
             }
         }
 
