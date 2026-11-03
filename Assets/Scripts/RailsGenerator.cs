@@ -26,10 +26,10 @@ public class RailsGenerator : MonoBehaviour
 
         while (t < 1f)
         {
-            float deltaT = splineManager.StepDistance(0, t, 0.5f).Item2;
-            if(deltaT <= 0f) break;
+            StepResult result = splineManager.StepDistance(0, t, 0.5f);
+            if(result.reachedEnd) break;
 
-            float nextT = Math.Min(t + deltaT, 1f);
+            float nextT = result.newT;
 
             Vector3 p1 = splineManager.ComputePoint(0, t);
             Vector3 p2 = splineManager.ComputePoint(0, nextT);
