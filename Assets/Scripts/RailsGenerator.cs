@@ -1,107 +1,143 @@
 using System;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 
 [RequireComponent(typeof(SplineManager))]
 public class RailsGenerator : MonoBehaviour
 {
-    private SplineManager splineManager;
-    private SplineTests splineTests;
-    public float railGauge = 1.5f;
-    public float railWidth = 1.0f;
+    public SplineManager splineManager;
+    public float railGauge = 1.435f;
+    public float railWidth = 0.13f;
+    public float railHeight = 0.143f;
 
-    void OnDrawGizmos()
+    public void GenerateRail()
     {
         splineManager = GetComponent<SplineManager>();
-        splineTests = GetComponent<SplineTests>();
 
-        if(splineManager.SplineCount() == 0) return;
-        if(splineTests.stepDistance <= 0f) return;
+        if (splineManager.SplineCount() == 0) return;
 
-        Gizmos.color = Color.grey;
+        List<Vector3> vertices = new List<Vector3>();
+        List<int> triangles = new List<int>();
+        List<Vector2> uvs = new List<Vector2>();
 
         float t = 0f;
+        float distance = 0f;
 
-        while(t < 1f)
+        while (t < 1f)
         {
-            float deltaT = splineManager.StepDistance(0, t, splineTests.stepDistance).Item2;
+            float deltaT = splineManager.StepDistance(0, t, 0.5f).Item2;
             if(deltaT <= 0f) break;
+
             float nextT = Math.Min(t + deltaT, 1f);
 
             Vector3 p1 = splineManager.ComputePoint(0, t);
             Vector3 p2 = splineManager.ComputePoint(0, nextT);
 
-            Vector3 n1 = splineManager.ComputeNormal(0, t);
-            Vector3 n2 = splineManager.ComputeNormal(0, nextT);
+            float segmentLength = Vector3.Distance(p1, p2);
+            float endDistance = distance + segmentLength;
 
-            float offset = railGauge / 2f;
+            Vector3 n1 = splineManager.ComputeNormal(0, t).normalized;
+            Vector3 n2 = splineManager.ComputeNormal(0, nextT).normalized;
 
-            Gizmos.DrawLine(p1 - n1 * offset, p2 - n2 * offset);
+            Vector3 up1 = splineManager.ComputeLocalUp(0, t);
+            Vector3 up2 = splineManager.ComputeLocalUp(0, nextT);
 
-            Gizmos.DrawLine(p1 + n1 * offset, p2 + n2 * offset);
+            Vector3 centerLeft1 = p1 - n1 * railGauge / 2f;
+            Vector3 centerLeft2 = p2 - n2 * railGauge / 2f;
 
+            Vector3 leftEdge1 = centerLeft1 - n1 * railWidth / 2f;
+            Vector3 rightEdge1 = centerLeft1 + n1 * railWidth / 2f;
+            Vector3 topLeftEdge1 = leftEdge1 + up1 * railHeight;
+            Vector3 topRightEdge1 = rightEdge1 + up1 * railHeight;
+            Vector3 leftEdge2 = centerLeft2 - n2 * railWidth / 2f;
+            Vector3 rightEdge2 = centerLeft2 + n2 * railWidth / 2f;
+            Vector3 topLeftEdge2 = leftEdge2 + up2 * railHeight;
+            Vector3 topRightEdge2 = rightEdge2 + up2 * railHeight;
+
+            Vector3 centerRight1 = p1 + n1 * railGauge / 2f;
+            Vector3 centerRight2 = p2 + n2 * railGauge / 2f;
+
+            Vector3 rLeftEdge1 = centerRight1 - n1 * railWidth / 2f;
+            Vector3 rRightEdge1 = centerRight1 + n1 * railWidth / 2f;
+            Vector3 rTopLeftEdge1 = rLeftEdge1 + up1 * railHeight;
+            Vector3 rTopRightEdge1 = rRightEdge1 + up1 * railHeight;
+            Vector3 rLeftEdge2 = centerRight2 - n2 * railWidth / 2f;
+            Vector3 rRightEdge2 = centerRight2 + n2 * railWidth / 2f;
+            Vector3 rTopLeftEdge2 = rLeftEdge2 + up2 * railHeight;
+            Vector3 rTopRightEdge2 = rRightEdge2 + up2 * railHeight;
+
+            AddQuad(vertices, triangles, uvs, topLeftEdge1, topRightEdge1, topLeftEdge2, topRightEdge2, distance, endDistance);
+            AddQuad(vertices, triangles, uvs, topRightEdge1, rightEdge1, topRightEdge2, rightEdge2, distance, endDistance);
+            AddQuad(vertices, triangles, uvs, rightEdge1, leftEdge1, rightEdge2, leftEdge2, distance, endDistance);
+            AddQuad(vertices, triangles, uvs, leftEdge1, topLeftEdge1, leftEdge2, topLeftEdge2, distance, endDistance);
+
+            AddQuad(vertices, triangles, uvs, rTopLeftEdge1, rTopRightEdge1, rTopLeftEdge2, rTopRightEdge2, distance, endDistance);
+            AddQuad(vertices, triangles, uvs, rTopRightEdge1, rRightEdge1, rTopRightEdge2, rRightEdge2, distance, endDistance);
+            AddQuad(vertices, triangles, uvs, rRightEdge1, rLeftEdge1, rRightEdge2, rLeftEdge2, distance, endDistance);
+            AddQuad(vertices, triangles, uvs, rLeftEdge1, rTopLeftEdge1, rLeftEdge2, rTopLeftEdge2, distance, endDistance);
+
+            distance += segmentLength;
             t = nextT;
-
-        }
-    }
-
-    [ContextMenu("Generate Rail")]
-    void GenerateRail()
-    {
-        splineManager = GetComponent<SplineManager>();
-        splineTests = GetComponent<SplineTests>();
-
-        if (splineManager.SplineCount() == 0) return;
-        if (splineTests.stepDistance <= 0f) return;
-
-        List<Vector3> vertices = new List<Vector3>();
-        List<int> triangles = new List<int>();
-
-        float t = 0f;
-
-        while (true)
-        {
-            Vector3 point = splineManager.ComputePoint(0, t);
-            Vector3 normal = splineManager.ComputeNormal(0, t);
-
-            // Centre du rail gauche
-            Vector3 center = point - normal * railGauge / 2f;
-
-            // Deux vertices de chaque section
-            vertices.Add(transform.InverseTransformPoint(
-                center - normal * railWidth / 2f));
-
-            vertices.Add(transform.InverseTransformPoint(
-                center + normal * railWidth / 2f));
-
-            // Connecter avec la section précédente
-            int i = vertices.Count - 4;
-
-            if (i >= 0)
-            {
-                triangles.AddRange(new int[]
-                {
-                    i, i + 1, i + 2,
-                    i + 1, i + 3, i + 2
-                });
-            }
-
-            if (t >= 1f) break;
-
-            float deltaT = splineManager.StepDistance(
-                0, t, splineTests.stepDistance
-            ).Item2;
-
-            if (deltaT <= 0f) break;
-
-            t = Mathf.Min(t + deltaT, 1f);
         }
 
         Mesh mesh = new Mesh();
         mesh.SetVertices(vertices);
         mesh.SetTriangles(triangles, 0);
+        mesh.SetUVs(0, uvs);
         mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
 
         GetComponent<MeshFilter>().sharedMesh = mesh;
     }
+
+    void Start()
+    {
+        splineManager = GetComponent<SplineManager>();
+    }
+
+    void AddQuad(List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, Vector3 a, Vector3 b, Vector3 c, Vector3 d, float distance, float endDistance)
+    {
+        int i = vertices.Count;
+
+        vertices.Add(transform.InverseTransformPoint(a));
+        vertices.Add(transform.InverseTransformPoint(b));
+        vertices.Add(transform.InverseTransformPoint(c));
+        vertices.Add(transform.InverseTransformPoint(d));
+
+        triangles.Add(i);
+        triangles.Add(i+1);
+        triangles.Add(i+2);
+
+        triangles.Add(i+3);
+        triangles.Add(i+2);
+        triangles.Add(i+1);
+
+        uvs.Add(new Vector2(0f, distance));
+        uvs.Add(new Vector2(1f, distance));
+        uvs.Add(new Vector2(0f, endDistance));
+        uvs.Add(new Vector2(1f, endDistance));
+    }
 }
+
+#if UNITY_EDITOR
+[CustomEditor(typeof(RailsGenerator))]
+public class RailsGeneratorEditor : Editor
+{
+    public override void OnInspectorGUI()
+    {
+        DrawDefaultInspector();
+
+        RailsGenerator railsGenerator = (RailsGenerator)target;
+
+        GUI.enabled = railsGenerator.splineManager != null && railsGenerator.splineManager.SplineCount() > 0;
+
+        if (GUILayout.Button("Generate Rail"))
+        {
+            railsGenerator.GenerateRail();
+        }
+
+        GUI.enabled = true;
+    }
+}
+#endif
