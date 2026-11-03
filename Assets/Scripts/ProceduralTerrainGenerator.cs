@@ -96,6 +96,18 @@ public class ProceduralTerrainGenerator : MonoBehaviour
             return;
         }
 
+        // Safety net: the Terrain lost its TerrainData asset (e.g. after a bad merge)
+        if (terrain.terrainData == null)
+        {
+            Debug.LogWarning("ProceduralTerrainGenerator: the Terrain has no TerrainData assigned, creating a temporary one. Reassign your TerrainData asset to keep it saved.");
+            TerrainData created = new TerrainData();
+            terrain.terrainData = created;
+
+            TerrainCollider col = GetComponent<TerrainCollider>();
+            if (col != null)
+                col.terrainData = created;
+        }
+
         TerrainData data = terrain.terrainData;
 
         data.heightmapResolution = Mathf.ClosestPowerOfTwo(
