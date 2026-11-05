@@ -17,9 +17,9 @@ public class RailsGenerator : MonoBehaviour
         splineManager = GetComponent<SplineManager>();
     }
 
-    public void GenerateRail()
+    public void GenerateRail(int splineIndex)
     {
-        if (splineManager.SplineCount() == 0) return;
+        if (splineManager.SplineCount() <= splineIndex) return;
 
         List<Vector3> vertices = new List<Vector3>();
         List<int> triangles = new List<int>();
@@ -28,24 +28,25 @@ public class RailsGenerator : MonoBehaviour
         float t = 0f;
         float distance = 0f;
 
-        while (t < 1f)
+        bool reachedEnd = false;
+        while (t < 1f && !reachedEnd)
         {
-            StepResult result = splineManager.StepDistance(0, t, 0.5f);
-            if(result.reachedEnd) break;
+            StepResult result = splineManager.StepDistance(splineIndex, t, 0.5f);
+            if(result.reachedEnd) { reachedEnd = true; }
 
             float nextT = result.newT;
 
-            Vector3 p1 = splineManager.ComputePoint(0, t);
-            Vector3 p2 = splineManager.ComputePoint(0, nextT);
+            Vector3 p1 = splineManager.ComputePoint(splineIndex, t);
+            Vector3 p2 = splineManager.ComputePoint(splineIndex, nextT);
 
             float segmentLength = Vector3.Distance(p1, p2);
             float endDistance = distance + segmentLength;
 
-            Vector3 n1 = splineManager.ComputeNormal(0, t).normalized;
-            Vector3 n2 = splineManager.ComputeNormal(0, nextT).normalized;
+            Vector3 n1 = splineManager.ComputeNormal(splineIndex, t).normalized;
+            Vector3 n2 = splineManager.ComputeNormal(splineIndex, nextT).normalized;
 
-            Vector3 up1 = splineManager.ComputeLocalUp(0, t);
-            Vector3 up2 = splineManager.ComputeLocalUp(0, nextT);
+            Vector3 up1 = splineManager.ComputeLocalUp(splineIndex, t);
+            Vector3 up2 = splineManager.ComputeLocalUp(splineIndex, nextT);
 
             Vector3 centerLeft1 = p1 - n1 * railGauge / 2f;
             Vector3 centerLeft2 = p2 - n2 * railGauge / 2f;
@@ -131,9 +132,17 @@ public class RailsGeneratorEditor : Editor
 
         GUI.enabled = railsGenerator.splineManager != null && railsGenerator.splineManager.SplineCount() > 0;
 
-        if (GUILayout.Button("Generate Rail"))
+        if (GUILayout.Button("Generate Rail 0"))
         {
-            railsGenerator.GenerateRail();
+            railsGenerator.GenerateRail(0);
+        }
+
+        if (GUILayout.Button("Generate All rails"))
+        {
+            for (int i = 0; i < railsGenerator.splineManager.SplineCount(); i++)
+            {
+                railsGenerator.GenerateRail(i);
+            }
         }
 
         GUI.enabled = true;
