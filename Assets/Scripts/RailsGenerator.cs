@@ -6,15 +6,19 @@ using UnityEngine;
 [RequireComponent(typeof(SplineManager))]
 public class RailsGenerator : MonoBehaviour
 {
+    [HideInInspector]
     public SplineManager splineManager;
     public float railGauge = 1.435f;
     public float railWidth = 0.13f;
     public float railHeight = 0.143f;
 
-    public void GenerateRail()
+    void Start()
     {
         splineManager = GetComponent<SplineManager>();
+    }
 
+    public void GenerateRail()
+    {
         if (splineManager.SplineCount() == 0) return;
 
         List<Vector3> vertices = new List<Vector3>();
@@ -89,11 +93,6 @@ public class RailsGenerator : MonoBehaviour
         mesh.RecalculateBounds();
 
         GetComponent<MeshFilter>().sharedMesh = mesh;
-    }
-
-    void Start()
-    {
-        splineManager = GetComponent<SplineManager>();
     }
 
     void AddQuad(List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, Vector3 a, Vector3 b, Vector3 c, Vector3 d, float distance, float endDistance)

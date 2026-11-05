@@ -36,8 +36,8 @@ public class MultiTrain : Train
 
         for (int i = 0; i < numberOfCars; i++)
         {
-            Gizmos.color = Color.blue;
-            Gizmos.DrawSphere(lastPosition, 2f);
+            Gizmos.color = i % 2 == 0 ? Color.red : Color.blue;
+            DrawBogey(splineIndex, lastT);
 
             if (i < numberOfCars - 1)
             {

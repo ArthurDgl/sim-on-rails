@@ -1,7 +1,7 @@
 #if UNITY_EDITOR
-using System.Collections.Generic;
 using UnityEditor;
 #endif
+using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(SplineManager))]
@@ -110,43 +110,6 @@ public class SplineTests : MonoBehaviour
         Gizmos.DrawSphere(step.position, 0.03f);
     }
 
-    public void RandomSpline()
-    {
-        splineManager.ClearSplines();
-        Vector3[] points = new Vector3[splinePoints];
-        for (int i = 0; i < splinePoints; i++)
-        {
-            points[i] = new Vector3(Random.value * 2f - 1f, Random.value * 0.2f, Random.value * 2f - 1f) * scale;
-        }
-        splineManager.FromPoints(points);
-    }
-
-    public void Create101Spline()
-    {
-        splineManager.ClearSplines();
-        Vector3[] points = new Vector3[3];
-        points[0] = new Vector3(-1f, 1f, 0f) * scale;
-        points[1] = new Vector3(0f, 0f, 0f) * scale;
-        points[2] = new Vector3(1f, 1f, 0f) * scale;
-        splineManager.FromPoints(points);
-    }
-
-    public void CreateTestTrack()
-    {
-        splineManager.ClearSplines();
-        Vector3[] points = new Vector3[9];
-        points[0] = new Vector3(0f, 0f, 1f) * scale;
-        points[1] = new Vector3(1f, 0f, 1f) * scale;
-        points[2] = new Vector3(2f, 0f, 0f) * scale;
-        points[3] = new Vector3(1f, 0f, -1f) * scale;
-        points[4] = new Vector3(0f, 0.2f, -1f) * scale;
-        points[5] = new Vector3(-1f, 0f, -1f) * scale;
-        points[6] = new Vector3(-2f, 0f, 0f) * scale;
-        points[7] = new Vector3(-1f, 0f, 1f) * scale;
-        points[8] = new Vector3(0f, 0f, 1f) * scale;
-        splineManager.FromPoints(points, 0, 0, true);
-    }
-
     public void TestStepDistance()
     {
         float[] requested = new float[distanceTests];
@@ -184,21 +147,6 @@ public class SplineTestsEditor : Editor
         SplineTests splineTests = (SplineTests)target;
 
         GUI.enabled = splineTests.splineManager != null;
-
-        if (GUILayout.Button("Random Spline"))
-        {
-            splineTests.RandomSpline();
-        }
-
-        if (GUILayout.Button("Create 101 Spline"))
-        {
-            splineTests.Create101Spline();
-        }
-
-        if (GUILayout.Button("Create Test Track"))
-        {
-            splineTests.CreateTestTrack();
-        }
 
         if (GUILayout.Button("Test Step Distance"))
         {
