@@ -10,8 +10,9 @@ public class RailsGenerator : MonoBehaviour
     public float railGauge = 1.435f;
     public float railWidth = 0.13f;
     public float railHeight = 0.143f;
+    public MeshFilter railsMeshFilter;
 
-    public void GenerateRail()
+    public void GenerateRails()
     {
         splineManager = GetComponent<SplineManager>();
 
@@ -23,12 +24,11 @@ public class RailsGenerator : MonoBehaviour
 
         float t = 0f;
         float distance = 0f;
-
-        while (t < 1f)
+        bool reachedEnd = false;
+        while (t < 1f && !reachedEnd)
         {
             StepResult result = splineManager.StepDistance(0, t, 0.5f);
-            if(result.reachedEnd) break;
-
+            reachedEnd = result.reachedEnd;
             float nextT = result.newT;
 
             Vector3 p1 = splineManager.ComputePoint(0, t);
@@ -81,6 +81,8 @@ public class RailsGenerator : MonoBehaviour
             t = nextT;
         }
 
+
+
         Mesh mesh = new Mesh();
         mesh.SetVertices(vertices);
         mesh.SetTriangles(triangles, 0);
@@ -88,7 +90,7 @@ public class RailsGenerator : MonoBehaviour
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
 
-        GetComponent<MeshFilter>().sharedMesh = mesh;
+        railsMeshFilter.sharedMesh = mesh;
     }
 
     void Start()
@@ -134,7 +136,7 @@ public class RailsGeneratorEditor : Editor
 
         if (GUILayout.Button("Generate Rail"))
         {
-            railsGenerator.GenerateRail();
+            railsGenerator.GenerateRails();
         }
 
         GUI.enabled = true;
