@@ -90,7 +90,7 @@ public class RailsGenerator : MonoBehaviour
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
 
-        railsMeshFilter.sharedMesh = mesh;
+        GetComponent<RailwayMeshManager>().SetRails(mesh);
     }
 
     void Start()

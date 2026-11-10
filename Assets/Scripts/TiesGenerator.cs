@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-[RequireComponent(typeof(SplineManager), typeof(MeshFilter), typeof(MeshRenderer))]
+[RequireComponent(typeof(SplineManager))]
 public class TiesGenerator : MonoBehaviour
 {
     public SplineManager splineManager;
@@ -47,7 +47,6 @@ public class TiesGenerator : MonoBehaviour
             Vector3 lateral = splineManager.ComputeNormal(0, t).normalized;
             Vector3 up = splineManager.ComputeLocalUp(0, t).normalized;
 
-            // Orthonormalize to avoid skewed boxes on sloped curves.
             lateral = Vector3.ProjectOnPlane(lateral, tangent).normalized;
             up = Vector3.Cross(tangent, lateral).normalized;
 
@@ -57,7 +56,6 @@ public class TiesGenerator : MonoBehaviour
                 Vector3 halfWidth = tangent * (tieWidth * 0.5f);
                 Vector3 height = up * tieHeight;
 
-                // The spline point is at the bottom center of each tie.
                 Vector3 a = point - halfLength - halfWidth;
                 Vector3 b = point + halfLength - halfWidth;
                 Vector3 c = point - halfLength + halfWidth;
@@ -68,7 +66,6 @@ public class TiesGenerator : MonoBehaviour
                 Vector3 C = c + height;
                 Vector3 D = d + height;
 
-                // Four vertices per face yield hard edges and independent UVs.
                 AddQuad(vertices, triangles, uvs, A, C, B, D); // Top
                 AddQuad(vertices, triangles, uvs, b, d, a, c); // Bottom
                 AddQuad(vertices, triangles, uvs, a, c, A, C); // Left end
@@ -86,7 +83,6 @@ public class TiesGenerator : MonoBehaviour
             if (nextT <= t + 0.000001f)
                 break;
 
-            // Do not add an extra shortened final spacing at the spline endpoint.
             if (result.reachedEnd)
                 break;
 
@@ -101,11 +97,8 @@ public class TiesGenerator : MonoBehaviour
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
 
-        railsMeshFilter.sharedMesh = mesh;
+        GetComponent<RailwayMeshManager>().SetTies(mesh);
 
-#if UNITY_EDITOR
-        EditorUtility.SetDirty(GetComponent<MeshFilter>());
-#endif
     }
 
     private void AddQuad(
