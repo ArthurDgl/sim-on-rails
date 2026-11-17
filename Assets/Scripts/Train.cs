@@ -2,6 +2,8 @@ using UnityEngine;
 
 public class Train : MonoBehaviour
 {
+    private const int BogeyPositionIterations = 10;
+
     public SplineManager splineManager;
 
     public bool attached = false;
@@ -27,6 +29,8 @@ public class Train : MonoBehaviour
     public float brake = 0f;
 
     public float maxBrake = 5000f;
+
+    public float carLength = 8f;
 
     void Awake()
     {
@@ -75,22 +79,22 @@ public class Train : MonoBehaviour
         acceleration = 0f;
     }
 
+    public void DrawBogey(int splineIndex, float t)
+    {
+        (Vector3 frontBogey, Vector3 rearBogey) = GetBogeyPositions(splineIndex, t);
+        Gizmos.DrawSphere(frontBogey, 1f);
+        Gizmos.DrawSphere(rearBogey, 1f);
+        Gizmos.DrawLine(frontBogey, rearBogey);
+    }
+
     void OnDrawGizmos()
     {
-        // show position of the train
-        Gizmos.color = Color.blue;
-        Gizmos.DrawWireSphere(transform.position, 2f);
-
-        // Gizmos.color = Color.red;
-        // Gizmos.DrawLine(transform.position, transform.position + shownForce);
-
-        // Show velocity along the tangent
-        // if (splineManager != null && attached)
-        // {
-        //     Gizmos.color = Color.blue;
-        //     Vector3 tangent = splineManager.ComputeTangent(attachedTo, currentT);
-        //     Gizmos.DrawLine(transform.position, transform.position + tangent * velocity);
-        // }
+        // show bogey positions with a straight line between them
+        if (splineManager != null && attached)
+        {
+            Gizmos.color = Color.green;
+            DrawBogey(attachedTo, currentT);
+        }
     }
 
     public virtual float GetEffectiveMass()
@@ -125,5 +129,27 @@ public class Train : MonoBehaviour
         ApplyGravity(attachedTo, currentT);
         ApplyThrottle(attachedTo, currentT);
         ApplyBrake(attachedTo, currentT);
+    }
+
+    /// <summary>
+    /// Gets the positions of the front and rear bogeys of the car. The abstract position along the spline is the projected center of the train.
+    /// Following this logic, this function needs to find 2 points equidistant from the center, such that the straight line distance between the 2 points is equal to the car length.
+    /// </summary>
+    /// <returns></returns>
+    public (Vector3, Vector3) GetBogeyPositions(int splineIndex, float t)
+    {
+        float optimalDistance = carLength / 2f;
+        StepResult frontStep = splineManager.StepDistance(splineIndex, t, optimalDistance, useStraightLineDistance: true);
+        StepResult rearStep = splineManager.StepDistance(splineIndex, t, -optimalDistance, useStraightLineDistance: true);
+        for (int i = 0; i < BogeyPositionIterations; i++)
+        {
+            float currentDistance = (frontStep.position - rearStep.position).magnitude;
+            float error = currentDistance - carLength;
+            if (Mathf.Abs(error) < 0.01f) break;
+            float adjustment = error / 2f;
+            frontStep = splineManager.StepDistance(splineIndex, t, optimalDistance - adjustment, useStraightLineDistance: true);
+            rearStep = splineManager.StepDistance(splineIndex, t, -optimalDistance - adjustment, useStraightLineDistance: true);
+        }
+        return (frontStep.position, rearStep.position);
     }
 }
