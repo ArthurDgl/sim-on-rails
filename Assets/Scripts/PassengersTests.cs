@@ -14,10 +14,10 @@ public class PassengersTests : MonoBehaviour
         stations.Add(new TrainStation());
         stations.Add(new TrainStation());
 
-        stations[0].passengers.Add(new Passenger(stations[0], stations[1]));
+        stations[0].passengers.Add(new Passenger(stations[0], stations[2]));
         stations[0].passengers.Add(new Passenger(stations[0], stations[2]));
         stations[1].passengers.Add(new Passenger(stations[1], stations[2]));
-        stations[1].passengers.Add(new Passenger(stations[1], stations[1]));
+        stations[1].passengers.Add(new Passenger(stations[1], stations[2]));
         stations[2].passengers.Add(new Passenger(stations[2], stations[1]));
         stations[2].passengers.Add(new Passenger(stations[2], stations[0]));
 

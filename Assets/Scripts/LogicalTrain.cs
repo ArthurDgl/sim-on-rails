@@ -10,27 +10,29 @@ public class LogicalTrain
     public TrainStation currentStation;
     private int currentStationIndex = 0;
     public List<Passenger> passengers = new List<Passenger>();
+    public int maxCapacity = 3;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     public LogicalTrain(List<TrainStation> stations)
-{
-    schedule = stations;
-
-    if (schedule == null || schedule.Count == 0)
     {
-        Debug.LogError("No stations!");
-        return;
+        schedule = stations;
+
+        if (schedule == null || schedule.Count == 0)
+        {
+            Debug.LogError("No stations!");
+            return;
+        }
+
+        currentStationIndex = 0;
+        currentStation = schedule[currentStationIndex];
+
+        takePassengers();
     }
-
-    currentStationIndex = 0;
-    currentStation = schedule[currentStationIndex];
-
-    takePassengers();
-}
     public void goToNextStation()
     {
         next();
         dropOffPassengers();
         takePassengers();
+        Debug.Log("changed station");
     }
 
     void dropOffPassengers()
@@ -58,7 +60,7 @@ public class LogicalTrain
             if(p.route.Count < 2) continue;
             if(p.route[1] == currentStation) continue;
             
-            if(schedule.Contains(p.route[1]))
+            if(schedule.Contains(p.route[1]) && passengers.Count < maxCapacity)
             {
                 passengers.Add(p);
                 currentStation.passengers.RemoveAt(i);
