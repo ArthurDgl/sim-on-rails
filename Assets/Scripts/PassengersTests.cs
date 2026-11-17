@@ -1,13 +1,12 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.LowLevelPhysics;
 
 public class PassengersTests : MonoBehaviour
 {
     public LogicalTrain train;
     public List<TrainStation> stations = new List<TrainStation>();
-    // Start is called once berailsGeneratorfore the first execution of Update after the MonoBehaviour is created
+
     void Start()
     {
         stations.Add(new TrainStation());
@@ -21,10 +20,13 @@ public class PassengersTests : MonoBehaviour
         stations[2].passengers.Add(new Passenger(stations[2], stations[1]));
         stations[2].passengers.Add(new Passenger(stations[2], stations[0]));
 
+        stations[0].containers.Add(new Container(stations[1], stations[2]));
+        stations[1].containers.Add(new Container(stations[2], stations[1]));
+        stations[2].containers.Add(new Container(stations[2], stations[0]));
+
         train = new LogicalTrain(stations);
     }
 
-    // Update is called once per frame
     void Update()
     {
         

@@ -1,17 +1,15 @@
 using System.Collections.Generic;
-using Unity.Jobs.LowLevel.Unsafe;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.UIElements;
 
 public class LogicalTrain
 {
-    public List<TrainStation> schedule = new List<TrainStation>();
+    public List<TrainStation> schedule;
     public TrainStation currentStation;
     private int currentStationIndex = 0;
-    public List<Passenger> passengers = new List<Passenger>();
+
+    public List<Ressource> ressources = new List<Ressource>();
     public int maxCapacity = 3;
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+
     public LogicalTrain(List<TrainStation> stations)
     {
         schedule = stations;
@@ -22,51 +20,76 @@ public class LogicalTrain
             return;
         }
 
-        currentStationIndex = 0;
-        currentStation = schedule[currentStationIndex];
-
-        takePassengers();
+        currentStation = schedule[0];
+        takeOnRessources();
     }
+
     public void goToNextStation()
     {
+        if (schedule == null || schedule.Count == 0) return;
+
+        Debug.Log("Changed station");
         next();
-        dropOffPassengers();
-        takePassengers();
-        Debug.Log("changed station");
+        dropOffRessources();
+        takeOnRessources();
     }
 
-    void dropOffPassengers()
+    void dropOffRessources()
     {
-        for(int i = passengers.Count - 1; i >= 0; i--)
-        {
-            Passenger p = passengers[i];
+        dropOff(currentStation.passengers);
+        dropOff(currentStation.containers);
+    }
 
-            if(p.route[1] == currentStation) 
+    void dropOff<T>(List<T> stationList) where T : Ressource
+    {
+        for (int i = ressources.Count - 1; i >= 0; i--)
+        {
+            if (ressources[i] is not T r)
+                continue;
+
+            if (r.route.Count < 2)
+                continue;
+
+            if (r.route[1] == currentStation)
             {
-                currentStation.passengers.Add(p);
-                p.changeStation(currentStation);
-                passengers.RemoveAt(i);
-                Debug.Log("dropped 1");
+                r.changeStation();
+                stationList.Add(r);
+                ressources.RemoveAt(i);
+
+                r.onDelivered();
             }
         }
     }
 
-    void takePassengers()
+    void takeOnRessources()
     {
-        for(int i = currentStation.passengers.Count - 1; i >= 0; i--)
-        {
-            Passenger p = currentStation.passengers[i];
+        takeOn(currentStation.passengers);
+        takeOn(currentStation.containers);
+    }
 
-            if(p.route.Count < 2) continue;
-            if(p.route[1] == currentStation) continue;
-            
-            if(schedule.Contains(p.route[1]) && passengers.Count < maxCapacity)
+    void takeOn<T>(List<T> stationList) where T : Ressource
+    {
+        for (int i = stationList.Count - 1; i >= 0; i--)
+        {
+            if (ressources.Count >= maxCapacity)
+                break;
+
+            T r = stationList[i];
+
+            if (r.route.Count < 2)
+                continue;
+
+            if (r.route[1] == currentStation)
+                continue;
+
+            if (schedule.Contains(r.route[1]))
             {
-                passengers.Add(p);
-                currentStation.passengers.RemoveAt(i);
-                Debug.Log("took 1");
+                ressources.Add(r);
+                stationList.RemoveAt(i);
+
+                r.onTaken();
             }
-        } 
+        }
     }
 
     void next()
@@ -74,5 +97,4 @@ public class LogicalTrain
         currentStationIndex = (currentStationIndex + 1) % schedule.Count;
         currentStation = schedule[currentStationIndex];
     }
-
 }
