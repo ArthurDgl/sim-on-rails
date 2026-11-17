@@ -14,12 +14,12 @@ public class TiesGenerator : MonoBehaviour
     public float tieWidth = 0.229f;
     public MeshFilter railsMeshFilter;
 
-    private void Reset()
+    private void Start()
     {
         splineManager = GetComponent<SplineManager>();
     }
 
-    public void GenerateTies()
+    public void GenerateTies(int splineIndex, bool addToExisting)
     {
         splineManager = GetComponent<SplineManager>();
 
@@ -42,10 +42,10 @@ public class TiesGenerator : MonoBehaviour
 
         while (t <= 1f && safetyCounter++ < 100000)
         {
-            Vector3 point = splineManager.ComputePoint(0, t);
-            Vector3 tangent = splineManager.ComputeTangent(0, t).normalized;
-            Vector3 lateral = splineManager.ComputeNormal(0, t).normalized;
-            Vector3 up = splineManager.ComputeLocalUp(0, t).normalized;
+            Vector3 point = splineManager.ComputePoint(splineIndex, t);
+            Vector3 tangent = splineManager.ComputeTangent(splineIndex, t).normalized;
+            Vector3 lateral = splineManager.ComputeNormal(splineIndex, t).normalized;
+            Vector3 up = splineManager.ComputeLocalUp(splineIndex, t).normalized;
 
             lateral = Vector3.ProjectOnPlane(lateral, tangent).normalized;
             up = Vector3.Cross(tangent, lateral).normalized;
@@ -77,7 +77,7 @@ public class TiesGenerator : MonoBehaviour
             if (t >= 1f)
                 break;
 
-            StepResult result = splineManager.StepDistance(0, t, tieSpacing);
+            StepResult result = splineManager.StepDistance(splineIndex, t, tieSpacing);
             float nextT = result.newT;
 
             if (nextT <= t + 0.000001f)
@@ -97,8 +97,19 @@ public class TiesGenerator : MonoBehaviour
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
 
-        GetComponent<RailwayMeshManager>().SetTies(mesh);
+        if (addToExisting)
+            GetComponent<RailwayMeshManager>().AddTies(mesh);
+        else
+            GetComponent<RailwayMeshManager>().SetTies(mesh);
 
+    }
+
+    public void GenerateAllTies()
+    {
+        for (int i = 0; i < splineManager.SplineCount(); i++)
+        {
+            GenerateTies(i, i > 0);
+        }
     }
 
     private void AddQuad(
@@ -142,9 +153,13 @@ public class TiesGeneratorEditor : Editor
 
         using (new EditorGUI.DisabledScope(!canGenerate))
         {
-            if (GUILayout.Button("Generate Ties"))
+            if (GUILayout.Button("Generate Ties 0"))
             {
-                generator.GenerateTies();
+                generator.GenerateTies(0, false);
+            }
+            if (GUILayout.Button("Generate All Ties"))
+            {
+                generator.GenerateAllTies();
             }
         }
     }

@@ -18,7 +18,7 @@ public class RailsGenerator : MonoBehaviour
         splineManager = GetComponent<SplineManager>();
     }
 
-    public void GenerateRail(int splineIndex)
+    public void GenerateRail(int splineIndex, bool addToExisting)
     {
         if (splineManager.SplineCount() <= splineIndex) return;
 
@@ -96,7 +96,18 @@ public class RailsGenerator : MonoBehaviour
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
 
-        GetComponent<RailwayMeshManager>().SetRails(mesh);
+        if (addToExisting)
+            GetComponent<RailwayMeshManager>().AddRails(mesh);
+        else
+            GetComponent<RailwayMeshManager>().SetRails(mesh);
+    }
+
+    public void GenerateAllRails()
+    {
+        for (int i = 0; i < splineManager.SplineCount(); i++)
+        {
+            GenerateRail(i, i > 0);
+        }
     }
 
     void AddQuad(List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, Vector3 a, Vector3 b, Vector3 c, Vector3 d, float distance, float endDistance)
@@ -137,15 +148,12 @@ public class RailsGeneratorEditor : Editor
 
         if (GUILayout.Button("Generate Rail 0"))
         {
-            railsGenerator.GenerateRail(0);
+            railsGenerator.GenerateRail(0, false);
         }
 
         if (GUILayout.Button("Generate All rails"))
         {
-            for (int i = 0; i < railsGenerator.splineManager.SplineCount(); i++)
-            {
-                railsGenerator.GenerateRail(i);
-            }
+            railsGenerator.GenerateAllRails();
         }
 
         GUI.enabled = true;

@@ -51,6 +51,21 @@ public class SplineGenerator : MonoBehaviour
         points[8] = new Vector3(0f, 0f, 1f) * scale;
         splineManager.FromPoints(points, 0, 0, true);
     }
+
+    public void Create2ParallelTracks()
+    {
+        splineManager.ClearSplines();
+        Vector3[] points1 = new Vector3[2];
+        points1[0] = new Vector3(0f, 0f, 0f) * scale;
+        points1[1] = new Vector3(1f, 0f, 0f) * scale;
+
+        Vector3[] points2 = new Vector3[2];
+        points2[0] = new Vector3(0f, 0f, 1f) * scale;
+        points2[1] = new Vector3(1f, 0f, 1f) * scale;
+
+        splineManager.FromPoints(points1);
+        splineManager.FromPoints(points2);
+    }
 }
 
 #if UNITY_EDITOR
@@ -78,6 +93,11 @@ public class SplineGeneratorEditor : Editor
         if (GUILayout.Button("Create Test Track"))
         {
             splineGenerator.CreateTestTrack();
+        }
+
+        if (GUILayout.Button("Create 2 Parallel Tracks"))
+        {
+            splineGenerator.Create2ParallelTracks();
         }
 
         GUI.enabled = true;

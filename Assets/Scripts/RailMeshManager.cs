@@ -18,9 +18,51 @@ public class RailwayMeshManager : MonoBehaviour
         UpdateMesh();
     }
 
+    public void AddRails(Mesh mesh)
+    {
+        if (railsMesh == null)
+            railsMesh = mesh;
+        else
+        {
+            CombineInstance combine = new CombineInstance();
+            combine.mesh = railsMesh;
+            combine.transform = Matrix4x4.identity;
+
+            CombineInstance newMesh = new CombineInstance();
+            newMesh.mesh = mesh;
+            newMesh.transform = Matrix4x4.identity;
+
+            Mesh combined = new Mesh();
+            combined.CombineMeshes(new CombineInstance[] { combine, newMesh }, true, false);
+            railsMesh = combined;
+        }
+        UpdateMesh();
+    }
+
     public void SetTies(Mesh mesh)
     {
         tiesMesh = mesh;
+        UpdateMesh();
+    }
+
+    public void AddTies(Mesh mesh)
+    {
+        if (tiesMesh == null)
+            tiesMesh = mesh;
+        else
+        {
+            CombineInstance combine = new CombineInstance();
+            combine.mesh = tiesMesh;
+            combine.transform = Matrix4x4.identity;
+
+            CombineInstance newMesh = new CombineInstance();
+            newMesh.mesh = mesh;
+            newMesh.transform = Matrix4x4.identity;
+
+            Mesh combined = new Mesh();
+            combined.CombineMeshes(new CombineInstance[] { combine, newMesh }, true, false);
+            tiesMesh = combined;
+        }
         UpdateMesh();
     }
 
