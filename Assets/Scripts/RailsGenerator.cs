@@ -11,6 +11,7 @@ public class RailsGenerator : MonoBehaviour
     public float railGauge = 1.435f;
     public float railWidth = 0.13f;
     public float railHeight = 0.143f;
+    public MeshFilter railsMeshFilter;
 
     void Start()
     {
@@ -86,6 +87,8 @@ public class RailsGenerator : MonoBehaviour
             t = nextT;
         }
 
+
+
         Mesh mesh = new Mesh();
         mesh.SetVertices(vertices);
         mesh.SetTriangles(triangles, 0);
@@ -93,7 +96,7 @@ public class RailsGenerator : MonoBehaviour
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
 
-        GetComponent<MeshFilter>().sharedMesh = mesh;
+        GetComponent<RailwayMeshManager>().SetRails(mesh);
     }
 
     void AddQuad(List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, Vector3 a, Vector3 b, Vector3 c, Vector3 d, float distance, float endDistance)
