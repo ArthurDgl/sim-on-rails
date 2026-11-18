@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-[System.Serializable]
 public class SplineHistory
 {
     public List<int> splineIndices = new List<int>();
@@ -95,9 +94,36 @@ public class Train : MonoBehaviour
 
         if (attached && history.splineIndices.Count == 0)
         {
-            attachedTo = 0;
-            isReversed = false;
+            InitializeHistory(0, false);
         }
+    }
+
+    void InitializeHistory(int currentSplineIndex, bool reversed = false)
+    {
+        history.splineIndices.Clear();
+        history.isReversed.Clear();
+        
+        List<int> defaultHistory = GetDefaultHistoryFor(currentSplineIndex, reversed);
+        defaultHistory.Reverse();
+        foreach (int entry in defaultHistory)
+        {
+            if (entry < 0)
+            {
+                history.splineIndices.Add(-entry);
+                history.isReversed.Add(true);
+            }
+            else
+            {
+                history.splineIndices.Add(entry);
+                history.isReversed.Add(false);
+            }
+        }
+        
+    }
+
+    public virtual List<int> GetDefaultHistoryFor(int currentSplineIndex, bool reversed = false)
+    {
+        return new List<int> { reversed ? -currentSplineIndex : currentSplineIndex };
     }
 
     void FixedUpdate()
@@ -144,7 +170,7 @@ public class Train : MonoBehaviour
         Gizmos.DrawLine(frontBogey, rearBogey);
     }
 
-    void OnDrawGizmos()
+    protected virtual void OnDrawGizmos()
     {
         // show bogey positions with a straight line between them
         if (splineManager != null && attached)
