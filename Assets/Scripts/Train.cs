@@ -1,4 +1,21 @@
+using System.Collections.Generic;
 using UnityEngine;
+
+[System.Serializable]
+public class SplineHistory
+{
+    public List<int> splineIndices = new List<int>();
+    public List<bool> isReversed = new List<bool>();
+
+    public void pruneOldest()
+    {
+        if (splineIndices.Count > 0 && isReversed.Count > 0)
+        {
+            splineIndices.RemoveAt(0);
+            isReversed.RemoveAt(0);
+        }
+    }
+}
 
 public class Train : MonoBehaviour
 {
@@ -8,7 +25,29 @@ public class Train : MonoBehaviour
 
     public bool attached = false;
 
-    public int attachedTo = 0;
+    public SplineHistory history;
+
+    public int attachedTo
+    {
+        get { return getSplineIndex(); }
+        set { history.splineIndices.Add(value); }
+    }
+
+    public int getSplineIndex(int historyDepth = 0)
+    {
+        return history.splineIndices[history.splineIndices.Count - 1 - historyDepth];
+    }
+
+    public bool isReversed
+    {
+        get { return getIsReversed(); }
+        set { history.isReversed.Add(value); }
+    }
+
+    public bool getIsReversed(int historyDepth = 0)
+    {
+        return history.isReversed[history.isReversed.Count - 1 - historyDepth];
+    }
 
     public float currentT = 0f;
 
@@ -31,6 +70,8 @@ public class Train : MonoBehaviour
     public float maxBrake = 5000f;
 
     public float carLength = 8f;
+    
+    protected int maxUsedHistoryDepth = 0;
 
     void Awake()
     {
@@ -39,15 +80,23 @@ public class Train : MonoBehaviour
 
     void Start()
     {
+        history = new SplineHistory();
+
         if (splineManager == null)
         {
             Debug.LogWarning("SplineManager not assigned.");
             return;
         }
-        if (splineManager.SplineCount() > 0)
+    }
+
+    void OnValidate()
+    {
+        if (!Application.isPlaying) return;
+
+        if (attached && history.splineIndices.Count == 0)
         {
-            attached = true;
             attachedTo = 0;
+            isReversed = false;
         }
     }
 
@@ -56,12 +105,19 @@ public class Train : MonoBehaviour
         if (splineManager == null) return;
         if (!attached) return;
 
+        maxUsedHistoryDepth = 0;
+
         ApplyForces();
+
+        if (maxUsedHistoryDepth < history.splineIndices.Count - 1)
+        {
+            history.pruneOldest();
+        }
 
         velocity += acceleration * Time.fixedDeltaTime;
         velocity *= Mathf.Exp(-damping * Time.fixedDeltaTime);
 
-        StepResult step = splineManager.StepDistance(attachedTo, currentT, velocity * Time.fixedDeltaTime);
+        StepResult step = splineManager.StepDistance(attachedTo, currentT, velocity * Time.fixedDeltaTime * (isReversed ? -1f : 1f));
 
         currentT = step.newT;
         transform.position = step.position;
@@ -70,6 +126,7 @@ public class Train : MonoBehaviour
             if (step.newSplineIndex >= 0)
             {
                 attachedTo = step.newSplineIndex;
+                isReversed = step.reverseDirection ? !isReversed : isReversed;
             }
             else
             {
@@ -104,7 +161,7 @@ public class Train : MonoBehaviour
 
     public void ApplyForce(Vector3 force, int splineIndex, float t)
     {
-        Vector3 tangent = splineManager.ComputeTangent(splineIndex, t);
+        Vector3 tangent = splineManager.ComputeTangent(splineIndex, t, isReversed);
         acceleration += Vector3.Dot(force, tangent) / GetEffectiveMass();
     }
 
@@ -114,13 +171,13 @@ public class Train : MonoBehaviour
     }
 
     public void ApplyThrottle(int splineIndex, float t) {
-        Vector3 tangent = splineManager.ComputeTangent(splineIndex, t);
+        Vector3 tangent = splineManager.ComputeTangent(splineIndex, t, isReversed);
         float force = throttle * maxThrottle;
         ApplyForce(tangent * force, splineIndex, t);
     }
 
     public void ApplyBrake(int splineIndex, float t) {
-        Vector3 tangent = splineManager.ComputeTangent(splineIndex, t);
+        Vector3 tangent = splineManager.ComputeTangent(splineIndex, t, isReversed);
         float force = velocity * brake * maxBrake;
         ApplyForce(-tangent * force, splineIndex, t);
     }
@@ -131,11 +188,6 @@ public class Train : MonoBehaviour
         ApplyBrake(attachedTo, currentT);
     }
 
-    /// <summary>
-    /// Gets the positions of the front and rear bogeys of the car. The abstract position along the spline is the projected center of the train.
-    /// Following this logic, this function needs to find 2 points equidistant from the center, such that the straight line distance between the 2 points is equal to the car length.
-    /// </summary>
-    /// <returns></returns>
     public (Vector3, Vector3) GetBogeyPositions(int splineIndex, float t)
     {
         float optimalDistance = carLength / 2f;

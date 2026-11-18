@@ -396,8 +396,10 @@ GameObject:
   - component: {fileID: 413440689}
   - component: {fileID: 413440691}
   - component: {fileID: 413440690}
+  - component: {fileID: 413440695}
   - component: {fileID: 413440693}
   - component: {fileID: 413440692}
+  - component: {fileID: 413440694}
   m_Layer: 0
   m_Name: Splines
   m_TagString: Untagged
@@ -473,6 +475,8 @@ MonoBehaviour:
   railGauge: 1.435
   railWidth: 0.13
   railHeight: 0.143
+  step: 5
+  railsMeshFilter: {fileID: 0}
 --- !u!114 &413440691
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -545,6 +549,38 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 413440686}
   m_Mesh: {fileID: 0}
+--- !u!114 &413440694
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 413440686}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 53da92d61ec8b62a1a201f381b2cdbb8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RailwayMeshManager
+  railsMaterial: {fileID: 2100000, guid: cdddea82620a7aa90ba7d7b78161a84f, type: 2}
+  tiesMaterial: {fileID: 2100000, guid: 47f476d270ba64959b58e4d6d9503a29, type: 2}
+--- !u!114 &413440695
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 413440686}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 89bff736f01eab7a696d86f229743f7b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TiesGenerator
+  splineManager: {fileID: 413440687}
+  tieSpacing: 0.5
+  tieHeight: 0.178
+  tieLength: 2.438
+  tieWidth: 0.229
+  railsMeshFilter: {fileID: 0}
 --- !u!1 &804655829
 GameObject:
   m_ObjectHideFlags: 0
@@ -785,7 +821,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MultiTrain
   splineManager: {fileID: 413440687}
   attached: 0
-  attachedTo: 0
+  history:
+    splineIndices: 
+    isReversed: 
   currentT: 0
   velocity: 0
   acceleration: 0

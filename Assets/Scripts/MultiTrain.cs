@@ -15,36 +15,54 @@ public class MultiTrain : Train
         base.ApplyForces();
 
         float lastT = currentT;
+        int historyDepth = 0;
+
         for (int i = 1; i < numberOfCars; i++)
         {
-            StepResult stepResult = splineManager.StepDistance(attachedTo, lastT, -carSpacing, useStraightLineDistance: true);
+            int preferSplineIndex = historyDepth + 1 < history.splineIndices.Count ? getSplineIndex(historyDepth+1) : -1;
+            StepResult stepResult = splineManager.StepDistance(getSplineIndex(historyDepth), lastT, -carSpacing * (getIsReversed(historyDepth) ? -1f : 1f), useStraightLineDistance: true, preferSplineIndex: preferSplineIndex);
             lastT = stepResult.newT;
-            int splineIndex = stepResult.newSplineIndex;
+            if (getSplineIndex(historyDepth) != stepResult.newSplineIndex){
+                historyDepth++;
 
-            ApplyGravity(splineIndex, lastT);
-            ApplyBrake(splineIndex, lastT);
+                if (historyDepth >= history.splineIndices.Count)
+                {
+                    break;
+                }
+            }
+
+            ApplyGravity(getSplineIndex(historyDepth), lastT);
+            ApplyBrake(getSplineIndex(historyDepth), lastT);
         }
+
+        maxUsedHistoryDepth = historyDepth;
     }
 
     void OnDrawGizmos()
     {
         if (splineManager == null || !attached) return;
 
-        Vector3 lastPosition = transform.position;
         float lastT = currentT;
-        int splineIndex = attachedTo;
+        int historyDepth = 0;
 
         for (int i = 0; i < numberOfCars; i++)
         {
             Gizmos.color = i % 2 == 0 ? Color.red : Color.blue;
-            DrawBogey(splineIndex, lastT);
+            DrawBogey(getSplineIndex(historyDepth), lastT);
 
             if (i < numberOfCars - 1)
             {
-                StepResult stepResult = splineManager.StepDistance(splineIndex, lastT, -carSpacing, useStraightLineDistance: true);
+                int preferSplineIndex = historyDepth + 1 < history.splineIndices.Count ? getSplineIndex(historyDepth+1) : -1;
+                StepResult stepResult = splineManager.StepDistance(getSplineIndex(historyDepth), lastT, -carSpacing * (getIsReversed(historyDepth) ? -1f : 1f), useStraightLineDistance: true, preferSplineIndex: preferSplineIndex);
                 lastT = stepResult.newT;
-                splineIndex = stepResult.newSplineIndex;
-                lastPosition = stepResult.position;
+                if (getSplineIndex(historyDepth) != stepResult.newSplineIndex){
+                    historyDepth++;
+
+                    if (historyDepth >= history.splineIndices.Count)
+                    {
+                        break;
+                    }
+                }
             }
         }
     }
