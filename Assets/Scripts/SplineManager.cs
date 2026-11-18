@@ -30,10 +30,22 @@ public struct StepResult
     public bool reverseDirection;
 }
 
+[System.Serializable]
 public struct PathPosition
 {
     public int splineIndex;
     public bool isGoingForward;
+
+    public PathPosition(int splineIndex, bool isGoingForward)
+    {
+        this.splineIndex = splineIndex;
+        this.isGoingForward = isGoingForward;
+    }
+
+    public PathPosition Default()
+    {
+        return new PathPosition(-1, true);
+    }
 }
 
 public class SplineManager : MonoBehaviour
@@ -267,7 +279,7 @@ public class SplineManager : MonoBehaviour
 
         while (known.Count > 0)
         {
-            PathPosition current = default;
+            PathPosition current = new PathPosition().Default();
             float minFScore = float.PositiveInfinity;
             foreach (PathPosition node in known)
             {
@@ -414,7 +426,7 @@ public class SplineManager : MonoBehaviour
         return (ComputePoint(splineIndex, t + stepT), stepT);
     }
 
-    public StepResult StepDistance(int splineIndex, float t, float distance, int resolution = 10, bool useDichotomy = true, bool useStraightLineDistance = false, int preferSplineIndex = -1)
+    public StepResult StepDistance(int splineIndex, float t, float distance, int resolution = 10, bool useDichotomy = true, bool useStraightLineDistance = false, int preferSplineIndex = -1, int preferDirection = -1)
     {
         float globalStepT = StepDistanceApprox(splineIndex, t, distance);
         
@@ -442,6 +454,11 @@ public class SplineManager : MonoBehaviour
             if (spline.endIsSource)
             {
                 bool useAlternate = sw.useAlternate && sw.defaultDestinationIndex != preferSplineIndex || sw.alternateDestinationIndex == preferSplineIndex;
+                if (preferDirection != -1 && sw.defaultDestinationIndex == sw.alternateDestinationIndex)
+                {
+                    bool preferForward = preferDirection == 1;
+                    useAlternate = preferForward ^ sw.defaultIsStart;
+                }
                 neighbor = useAlternate ? sw.alternateDestinationIndex : sw.defaultDestinationIndex;
                 neighborIsReversed = useAlternate ? !sw.alternateIsStart : !sw.defaultIsStart;
             }
@@ -457,6 +474,11 @@ public class SplineManager : MonoBehaviour
             if (spline.startIsSource)
             {
                 bool useAlternate = sw.useAlternate && sw.defaultDestinationIndex != preferSplineIndex || sw.alternateDestinationIndex == preferSplineIndex;
+                if (preferDirection != -1 && sw.defaultDestinationIndex == sw.alternateDestinationIndex)
+                {
+                    bool preferForward = preferDirection == 1;
+                    useAlternate = preferForward ^ sw.defaultIsStart;
+                }
                 neighbor = useAlternate ? sw.alternateDestinationIndex : sw.defaultDestinationIndex;
                 neighborIsReversed = useAlternate ? sw.alternateIsStart : sw.defaultIsStart;
             }

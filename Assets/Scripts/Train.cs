@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+[System.Serializable]
 public class SplineHistory
 {
     public List<int> splineIndices = new List<int>();
@@ -13,6 +14,47 @@ public class SplineHistory
             splineIndices.RemoveAt(0);
             isReversed.RemoveAt(0);
         }
+    }
+}
+
+[System.Serializable]
+public class PathFollowing
+{
+    public List<PathPosition> path = new List<PathPosition>();
+
+    public PathPosition CurrentPosition
+    {
+        get { return path.Count > 0 ? path[0] : new PathPosition().Default(); }
+    }
+
+    public PathPosition NextPosition
+    {
+        get { return path.Count > 1 ? path[1] : new PathPosition().Default(); }
+    }
+
+    public PathFollowing()
+    {
+        path = new List<PathPosition>();
+    }
+
+    public PathFollowing(List<PathPosition> initialPath)
+    {
+        path = initialPath ?? new List<PathPosition>();
+    }
+
+    public bool AdvancePathIsDone()
+    {
+        if (path.Count > 0)
+        {
+            path.RemoveAt(0);
+
+            if (path.Count <= 1)
+            {
+                Debug.Log("Path has been fully advanced.");
+                return true;
+            }
+        }
+        return false;
     }
 }
 
@@ -72,6 +114,10 @@ public class Train : MonoBehaviour
     
     protected int maxUsedHistoryDepth = 0;
 
+    public PathFollowing pathFollowing = new PathFollowing();
+
+    public PathPosition goal;
+
     void Awake()
     {
         Time.fixedDeltaTime = 0.02f;
@@ -80,6 +126,8 @@ public class Train : MonoBehaviour
     void Start()
     {
         history = new SplineHistory();
+
+        pathFollowing = null;
 
         if (splineManager == null)
         {
@@ -95,6 +143,50 @@ public class Train : MonoBehaviour
         if (attached && history.splineIndices.Count == 0)
         {
             InitializeHistory(0, false);
+        }
+    }
+
+    PathPosition GetCurrentPathPosition()
+    {
+        return new PathPosition
+        {
+            splineIndex = attachedTo,
+            isGoingForward = !isReversed
+        };
+    }
+
+    void SetPathFollowing(PathFollowing newPathFollowing)
+    {
+        if (newPathFollowing == null)
+        {
+            Debug.LogWarning("Attempted to set a null PathFollowing instance.");
+            return;
+        }
+
+        if (!newPathFollowing.CurrentPosition.Equals(GetCurrentPathPosition()))
+        {
+            Debug.LogWarning("New PathFollowing instance does not match the current path position.");
+            return;
+        }
+
+        pathFollowing = newPathFollowing;
+    }
+
+    public void PathfindToGoal()
+    {
+        if (splineManager == null) return;
+        if (!attached) return;
+
+        List<PathPosition> pathToGoal = splineManager.Pathfind(GetCurrentPathPosition(), goal);
+
+        if (pathToGoal == null || pathToGoal.Count == 0)
+        {
+            Debug.LogWarning("No path found to goal.");
+            return;
+        }
+        else
+        {
+            SetPathFollowing(new PathFollowing(pathToGoal));
         }
     }
 
@@ -143,7 +235,9 @@ public class Train : MonoBehaviour
         velocity += acceleration * Time.fixedDeltaTime;
         velocity *= Mathf.Exp(-damping * Time.fixedDeltaTime);
 
-        StepResult step = splineManager.StepDistance(attachedTo, currentT, velocity * Time.fixedDeltaTime * (isReversed ? -1f : 1f));
+        int preferedSplineIndex = pathFollowing != null ? pathFollowing.NextPosition.splineIndex : -1;
+        int preferedDirection = pathFollowing != null ? (pathFollowing.NextPosition.isGoingForward ? 1 : 0) : -1;
+        StepResult step = splineManager.StepDistance(attachedTo, currentT, velocity * Time.fixedDeltaTime * (isReversed ? -1f : 1f), preferSplineIndex: preferedSplineIndex, preferDirection: preferedDirection);
 
         currentT = step.newT;
         transform.position = step.position;
@@ -153,6 +247,12 @@ public class Train : MonoBehaviour
             {
                 attachedTo = step.newSplineIndex;
                 isReversed = step.reverseDirection ? !isReversed : isReversed;
+                if (pathFollowing != null) {
+                    if (pathFollowing.AdvancePathIsDone())
+                    {
+                        pathFollowing = null;
+                    }
+                }
             }
             else
             {

@@ -1,5 +1,8 @@
 using UnityEngine;
 using System.Collections.Generic;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public class MultiTrain : Train
 {
@@ -42,7 +45,8 @@ public class MultiTrain : Train
         for (int i = 1; i < numberOfCars; i++)
         {
             int preferSplineIndex = historyDepth + 1 < history.splineIndices.Count ? getSplineIndex(historyDepth+1) : -1;
-            StepResult stepResult = splineManager.StepDistance(getSplineIndex(historyDepth), lastT, -carSpacing * (getIsReversed(historyDepth) ? -1f : 1f), useStraightLineDistance: true, preferSplineIndex: preferSplineIndex);
+            int preferDirection = historyDepth + 1 < history.splineIndices.Count ? (getIsReversed(historyDepth+1) ? 1 : 0) : -1; // Iterating backwards through the train, so reversed is flipped
+            StepResult stepResult = splineManager.StepDistance(getSplineIndex(historyDepth), lastT, -carSpacing * (getIsReversed(historyDepth) ? -1f : 1f), useStraightLineDistance: true, preferSplineIndex: preferSplineIndex, preferDirection: preferDirection);
             lastT = stepResult.newT;
             if (getSplineIndex(historyDepth) != stepResult.newSplineIndex){
                 historyDepth++;
@@ -72,7 +76,8 @@ public class MultiTrain : Train
         for (int i = 1; i < numberOfCars; i++)
         {
             int preferSplineIndex = historyDepth + 1 < history.splineIndices.Count ? getSplineIndex(historyDepth+1) : -1;
-            StepResult stepResult = splineManager.StepDistance(getSplineIndex(historyDepth), lastT, -carSpacing * (getIsReversed(historyDepth) ? -1f : 1f), useStraightLineDistance: true, preferSplineIndex: preferSplineIndex);
+            int preferDirection = historyDepth + 1 < history.splineIndices.Count ? (getIsReversed(historyDepth+1) ? 1 : 0) : -1; // See comment above about iterating backwards through the train
+            StepResult stepResult = splineManager.StepDistance(getSplineIndex(historyDepth), lastT, -carSpacing * (getIsReversed(historyDepth) ? -1f : 1f), useStraightLineDistance: true, preferSplineIndex: preferSplineIndex, preferDirection: preferDirection);
             lastT = stepResult.newT;
             if (getSplineIndex(historyDepth) != stepResult.newSplineIndex){
                 historyDepth++;
@@ -88,3 +93,20 @@ public class MultiTrain : Train
         }
     }
 }
+
+#if UNITY_EDITOR
+[CustomEditor(typeof(MultiTrain))]
+public class MultiTrainEditor : Editor
+{
+    public override void OnInspectorGUI()
+    {
+        DrawDefaultInspector();
+
+        MultiTrain multiTrain = (MultiTrain)target;
+        if (GUILayout.Button("Pathfind to Goal"))
+        {
+            multiTrain.PathfindToGoal();
+        }
+    }
+}
+#endif
