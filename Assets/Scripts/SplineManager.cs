@@ -30,6 +30,12 @@ public struct StepResult
     public bool reverseDirection;
 }
 
+public struct PathPosition
+{
+    public int splineIndex;
+    public bool isGoingForward;
+}
+
 public class SplineManager : MonoBehaviour
 {
     private List<Spline> splines;
@@ -183,6 +189,132 @@ public class SplineManager : MonoBehaviour
         Vector3 tangent = ComputeTangent(splineIndex, t, false);
         Vector3 normal = Vector3.Cross(tangent, Vector3.up).normalized;
         return Vector3.Cross(normal, tangent).normalized;
+    }
+
+    public float Heuristic(PathPosition spline, PathPosition endSpline)
+    {
+        Vector3 startPoint = ComputePoint(spline.splineIndex, 0.5f);
+        Vector3 endPoint = ComputePoint(endSpline.splineIndex, 0.5f);
+        return Vector3.Distance(startPoint, endPoint);
+    }
+
+    public List<PathPosition> GetNeighbors(PathPosition current)
+    {
+        List<PathPosition> neighbors = new List<PathPosition>();
+
+        Spline spline = splines[current.splineIndex];
+        int switchIndex = current.isGoingForward ? spline.endSwitchIndex : spline.startSwitchIndex;
+        if (switchIndex < 0 || switchIndex >= switches.Count)
+        {
+            return neighbors;
+        }
+        Switch sw = switches[switchIndex];
+
+        if (current.isGoingForward ? spline.endIsSource : spline.startIsSource)
+        {
+            if (sw.defaultDestinationIndex >= 0)
+            {
+                neighbors.Add(new PathPosition { splineIndex = sw.defaultDestinationIndex, isGoingForward = sw.defaultIsStart });
+            }
+            if (sw.alternateDestinationIndex >= 0)
+            {
+                neighbors.Add(new PathPosition { splineIndex = sw.alternateDestinationIndex, isGoingForward = sw.alternateIsStart });
+            }
+        }
+        else
+        {
+            if (sw.sourceSplineIndex >= 0)
+            {
+                neighbors.Add(new PathPosition { splineIndex = sw.sourceSplineIndex, isGoingForward = sw.sourceIsStart });
+            }
+        }
+        return neighbors;
+    }
+
+    public List<PathPosition> ReconstructPath(Dictionary<PathPosition, PathPosition> cameFrom, PathPosition current)
+    {
+        List<PathPosition> totalPath = new List<PathPosition> { current };
+        while (cameFrom.ContainsKey(current))
+        {
+            current = cameFrom[current];
+            totalPath.Insert(0, current);
+        }
+        return totalPath;
+    }
+
+    public List<PathPosition> Pathfind(PathPosition startSpline, PathPosition endSpline)
+    {
+        HashSet<PathPosition> known = new HashSet<PathPosition>();
+        known.Add(startSpline);
+
+        Dictionary<PathPosition, PathPosition> cameFrom = new Dictionary<PathPosition, PathPosition>();
+
+        Dictionary<PathPosition, float> gScore = new Dictionary<PathPosition, float>();
+        for (int i = 0; i < splines.Count; i++)
+        {
+            gScore[new PathPosition { splineIndex = i, isGoingForward = true }] = float.PositiveInfinity;
+            gScore[new PathPosition { splineIndex = i, isGoingForward = false }] = float.PositiveInfinity;
+        }
+        gScore[startSpline] = 0f;
+
+        Dictionary<PathPosition, float> fScore = new Dictionary<PathPosition, float>();
+        for (int i = 0; i < splines.Count; i++)
+        {
+            fScore[new PathPosition { splineIndex = i, isGoingForward = true }] = float.PositiveInfinity;
+            fScore[new PathPosition { splineIndex = i, isGoingForward = false }] = float.PositiveInfinity;
+        }
+        fScore[startSpline] = Heuristic(startSpline, endSpline);
+
+        while (known.Count > 0)
+        {
+            PathPosition current = default;
+            float minFScore = float.PositiveInfinity;
+            foreach (PathPosition node in known)
+            {
+                if (fScore[node] < minFScore)
+                {
+                    minFScore = fScore[node];
+                    current = node;
+                }
+            }
+
+            if (current.Equals(endSpline))
+            {
+                return ReconstructPath(cameFrom, current);
+            }
+
+            known.Remove(current);
+            float currentLength = ApproximateSplineLength(current.splineIndex);
+            foreach (PathPosition neighbor in GetNeighbors(current))
+            {
+                float tentativeGScore = gScore[current] + currentLength;
+                if (tentativeGScore < gScore[neighbor])
+                {
+                    cameFrom[neighbor] = current;
+                    gScore[neighbor] = tentativeGScore;
+                    fScore[neighbor] = gScore[neighbor] + Heuristic(neighbor, endSpline);
+                    known.Add(neighbor);
+                }
+            }
+        }
+        return null;
+    }
+
+    public float ApproximateSplineLength(int splineIndex, int resolution = 100)
+    {
+        Spline spline = splines[splineIndex];
+        List<Vector3> points = spline.points;
+
+        float length = 0f;
+        Vector3 previousPoint = points[0];
+        for (int i = 1; i <= resolution; i++)
+        {
+            float t = i / (float)resolution;
+            Vector3 currentPoint = ComputePoint(splineIndex, t);
+            length += Vector3.Distance(currentPoint, previousPoint);
+            previousPoint = currentPoint;
+        }
+        return length;
     }
 
     public float StepDistanceApprox(int splineIndex, float t, float distance)
