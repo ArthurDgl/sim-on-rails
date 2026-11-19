@@ -1,5 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System;
+
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -35,17 +37,15 @@ public class MultiTrain : Train
         return mass * numberOfCars;
     }
 
-    public override void ApplyForces()
+    private int IterateOverLatterCars(Action<float, int> action, bool reverseReversed = true)
     {
-        base.ApplyForces();
-
         float lastT = currentT;
         int historyDepth = 0;
 
         for (int i = 1; i < numberOfCars; i++)
         {
             int preferSplineIndex = historyDepth + 1 < history.splineIndices.Count ? getSplineIndex(historyDepth+1) : -1;
-            int preferDirection = historyDepth + 1 < history.splineIndices.Count ? (getIsReversed(historyDepth+1) ? 1 : 0) : -1; // Iterating backwards through the train, so reversed is flipped
+            int preferDirection = historyDepth + 1 < history.splineIndices.Count ? (getIsReversed(historyDepth+1) ^ reverseReversed ? 0 : 1) : -1;
             StepResult stepResult = splineManager.StepDistance(getSplineIndex(historyDepth), lastT, -carSpacing * (getIsReversed(historyDepth) ? -1f : 1f), useStraightLineDistance: true, preferSplineIndex: preferSplineIndex, preferDirection: preferDirection);
             lastT = stepResult.newT;
             if (getSplineIndex(historyDepth) != stepResult.newSplineIndex){
@@ -57,11 +57,34 @@ public class MultiTrain : Train
                 }
             }
 
-            ApplyGravity(getSplineIndex(historyDepth), lastT);
-            ApplyBrake(getSplineIndex(historyDepth), lastT);
+            action(lastT, historyDepth);
         }
 
-        maxUsedHistoryDepth = historyDepth;
+        return historyDepth;
+    }
+
+    public override void ApplyForces()
+    {
+        base.ApplyForces();
+
+        maxUsedHistoryDepth = IterateOverLatterCars((t, historyDepth) => {
+            ApplyGravity(getSplineIndex(historyDepth), t);
+            ApplyBrake(getSplineIndex(historyDepth), t);
+        });
+    }
+
+    public override TrainGraphics[] GetTrainGraphics()
+    {
+        TrainGraphics[] result = new TrainGraphics[numberOfCars];
+        result[0] = ComputeTrainGraphics();
+
+        int i = 1;
+        IterateOverLatterCars((t, historyDepth) => {
+            result[i] = ComputeTrainGraphics(getSplineIndex(historyDepth), t, getIsReversed(historyDepth));
+            i++;
+        });
+
+        return result;
     }
 
     protected override void OnDrawGizmos()
@@ -70,27 +93,12 @@ public class MultiTrain : Train
 
         base.OnDrawGizmos();
 
-        float lastT = currentT;
-        int historyDepth = 0;
-
-        for (int i = 1; i < numberOfCars; i++)
-        {
-            int preferSplineIndex = historyDepth + 1 < history.splineIndices.Count ? getSplineIndex(historyDepth+1) : -1;
-            int preferDirection = historyDepth + 1 < history.splineIndices.Count ? (getIsReversed(historyDepth+1) ? 1 : 0) : -1; // See comment above about iterating backwards through the train
-            StepResult stepResult = splineManager.StepDistance(getSplineIndex(historyDepth), lastT, -carSpacing * (getIsReversed(historyDepth) ? -1f : 1f), useStraightLineDistance: true, preferSplineIndex: preferSplineIndex, preferDirection: preferDirection);
-            lastT = stepResult.newT;
-            if (getSplineIndex(historyDepth) != stepResult.newSplineIndex){
-                historyDepth++;
-
-                if (historyDepth >= history.splineIndices.Count)
-                {
-                    break;
-                }
-            }
-
+        int i = 1;
+        IterateOverLatterCars((t, historyDepth) => {
             Gizmos.color = i % 2 == 0 ? Color.red : Color.blue;
-            DrawBogey(getSplineIndex(historyDepth), lastT);
-        }
+            DrawBogey(getSplineIndex(historyDepth), t);
+            i++;
+        });
     }
 }
 

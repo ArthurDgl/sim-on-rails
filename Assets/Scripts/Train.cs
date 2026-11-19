@@ -17,6 +17,16 @@ public class SplineHistory
     }
 }
 
+public struct TrainGraphics
+{
+    public Vector3 frontOffset;
+    public Vector3 rearOffset;
+    public Vector3 centerOffset; // Real center offset from logical position on spline
+    public Vector3 tangent;
+    public Vector3 normal;
+    public Vector3 localUp;
+}
+
 [System.Serializable]
 public class PathFollowing
 {
@@ -329,5 +339,39 @@ public class Train : MonoBehaviour
             rearStep = splineManager.StepDistance(splineIndex, t, -optimalDistance - adjustment, useStraightLineDistance: true);
         }
         return (frontStep.position, rearStep.position);
+    }
+
+    public (Vector3, Vector3, Vector3) GetGraphicsPosition(int splineIndex, float t)
+    {
+        (Vector3 front, Vector3 rear) = GetBogeyPositions(splineIndex, t);
+        return (front, rear, (front + rear) / 2f);
+    }
+
+    public TrainGraphics ComputeTrainGraphics(int attachedTo = -1, float currentT = 0f, bool isReversed = false)
+    {
+        if (attachedTo == -1)
+        {
+            attachedTo = this.attachedTo;
+            currentT = this.currentT;
+            isReversed = this.isReversed;
+        }
+        (Vector3 front, Vector3 rear, Vector3 center) = GetGraphicsPosition(attachedTo, currentT);
+        Vector3 tangent = splineManager.ComputeTangent(attachedTo, currentT, isReversed);
+        Vector3 normal = Vector3.Cross(tangent, Vector3.up).normalized;
+        TrainGraphics graphics = new TrainGraphics
+        {
+            frontOffset = front - center,
+            rearOffset = rear - center,
+            centerOffset = center - transform.position,
+            tangent = tangent,
+            normal = normal,
+            localUp = Vector3.up
+        };
+        return graphics;
+    }
+
+    public virtual TrainGraphics[] GetTrainGraphics()
+    {
+        return new TrainGraphics[] { ComputeTrainGraphics() };
     }
 }
