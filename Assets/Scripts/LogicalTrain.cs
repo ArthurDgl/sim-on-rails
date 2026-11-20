@@ -8,7 +8,8 @@ public class LogicalTrain
     private int currentStationIndex = 0;
 
     public List<Ressource> ressources = new List<Ressource>();
-    public int maxCapacity = 3;
+    public int peopleCapacity = 3;
+    public int containerCapacity = 2;
 
     public LogicalTrain(List<TrainStation> stations)
     {
@@ -40,20 +41,18 @@ public class LogicalTrain
         dropOff(currentStation.containers);
     }
 
-    void dropOff<T>(List<T> stationList) where T : Ressource
+    void dropOff<T>(List<T> ressourceList) where T : Ressource
     {
         for (int i = ressources.Count - 1; i >= 0; i--)
         {
-            if (ressources[i] is not T r)
-                continue;
-
+            if (ressources[i] is not T r) continue;
             if (r.route.Count < 2)
                 continue;
 
             if (r.route[1] == currentStation)
             {
                 r.changeStation();
-                stationList.Add(r);
+                ressourceList.Add(r);
                 ressources.RemoveAt(i);
 
                 r.onDelivered();
@@ -63,29 +62,33 @@ public class LogicalTrain
 
     void takeOnRessources()
     {
-        takeOn(currentStation.passengers);
-        takeOn(currentStation.containers);
+        takeOn(currentStation.passengers, peopleCapacity);
+        takeOn(currentStation.containers, containerCapacity);
     }
 
-    void takeOn<T>(List<T> stationList) where T : Ressource
+    void takeOn<T>(List<T> ressourceList, int ressourceCapacity) where T : Ressource
     {
-        for (int i = stationList.Count - 1; i >= 0; i--)
+        int loadedCount = 0;
+        foreach (Ressource r in ressources)
         {
-            if (ressources.Count >= maxCapacity)
-                break;
+            if (r is T) loadedCount++;
+        }
 
-            T r = stationList[i];
+        for (int i = ressourceList.Count - 1; i >= 0; i--)
+        {
+            if (loadedCount >= ressourceCapacity) break;
 
-            if (r.route.Count < 2)
-                continue;
+            T r = ressourceList[i];
 
-            if (r.route[1] == currentStation)
-                continue;
+            if (r.route.Count < 2) continue;
+
+            if (r.route[1] == currentStation) continue;
 
             if (schedule.Contains(r.route[1]))
             {
                 ressources.Add(r);
-                stationList.RemoveAt(i);
+                ressourceList.RemoveAt(i);
+                loadedCount++;
 
                 r.onTaken();
             }

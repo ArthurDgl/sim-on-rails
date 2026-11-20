@@ -20,8 +20,10 @@ public class PassengersTests : MonoBehaviour
         stations[2].passengers.Add(new Passenger(stations[2], stations[1]));
         stations[2].passengers.Add(new Passenger(stations[2], stations[0]));
 
-        stations[0].containers.Add(new Container(stations[1], stations[2]));
-        stations[1].containers.Add(new Container(stations[2], stations[1]));
+        stations[0].containers.Add(new Container(stations[0], stations[2]));
+        stations[1].containers.Add(new Container(stations[1], stations[2]));
+        stations[2].containers.Add(new Container(stations[2], stations[0]));
+        stations[2].containers.Add(new Container(stations[2], stations[0]));
         stations[2].containers.Add(new Container(stations[2], stations[0]));
 
         train = new LogicalTrain(stations);
