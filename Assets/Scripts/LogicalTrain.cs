@@ -28,6 +28,7 @@ public class LogicalTrain
     public IEnumerator initialize()
     {
         yield return takeOnRessources();
+        launchTrain();
     }
 
     public IEnumerator goToNextStation()
@@ -38,6 +39,7 @@ public class LogicalTrain
         next();
         yield return dropOffRessources();
         yield return takeOnRessources();
+        launchTrain();
     }
 
     IEnumerator dropOffRessources()
@@ -106,5 +108,10 @@ public class LogicalTrain
     {
         currentStationIndex = (currentStationIndex + 1) % schedule.Count;
         currentStation = schedule[currentStationIndex];
+    }
+
+    void launchTrain()
+    {
+        Debug.Log("Train launched from " + currentStation.name + " to " + schedule[(currentStationIndex + 1) % schedule.Count].name);
     }
 }

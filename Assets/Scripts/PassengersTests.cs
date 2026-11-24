@@ -11,9 +11,9 @@ public class PassengersTests : MonoBehaviour
 
     void Start()
     {
-        stations.Add(new TrainStation());
-        stations.Add(new TrainStation());
-        stations.Add(new TrainStation());
+        stations.Add(new TrainStation("Gare de l'Est - 1"));
+        stations.Add(new TrainStation("Gare de Lyon - 2"));
+        stations.Add(new TrainStation("Gare du Nord - 3"));
 
         stations[0].passengers.Add(new Passenger(stations[0], stations[2]));
         stations[0].passengers.Add(new Passenger(stations[0], stations[2]));
