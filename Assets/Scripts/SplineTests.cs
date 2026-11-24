@@ -1,21 +1,34 @@
 #if UNITY_EDITOR
-using System.Collections.Generic;
 using UnityEditor;
 #endif
+using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(SplineManager))]
 public class SplineTests : MonoBehaviour
 {
-    private SplineManager splineManager;
+    [HideInInspector]
+    public SplineManager splineManager;
 
     public int splinePoints = 4;
     public int resolution = 10;
+
+    public bool hideOtherTests = true;
+
+    public float scale = 100f;
 
     [Range(0f, 1f)]
     public float currentT = 0f;
 
     public bool autoPlay = false;
+
+    public int distanceTests = 1000;
+    public float minDistance = 0.001f;
+    public float maxDistance = 0.1f;
+
+    public float stepDistance = 0.01f;
+    public int stepResolution = 10;
+    public bool useDichotomy = false;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -70,6 +83,8 @@ public class SplineTests : MonoBehaviour
             Gizmos.DrawLine(samples[i], samples[i + 1]);
         }
 
+        if (hideOtherTests) return;
+
         // Draw current point at current t
         Gizmos.color = Color.blue;
         Vector3 point = splineManager.ComputePoint(0, currentT);
@@ -85,17 +100,58 @@ public class SplineTests : MonoBehaviour
         Gizmos.color = Color.yellow;
         Vector3 localUp = splineManager.ComputeLocalUp(0, currentT);
         Gizmos.DrawLine(point, point + localUp * 0.1f);
+
+        // Draw expected and actual step distance point
+        Gizmos.color = Color.magenta;
+        Vector3 expectedStepPoint = point + tangent.normalized * stepDistance;
+        Gizmos.DrawSphere(expectedStepPoint, 0.03f);
+        Gizmos.color = Color.cyan;
+        StepResult step = splineManager.StepDistance(0, currentT, stepDistance, stepResolution, useDichotomy);
+        Gizmos.DrawSphere(step.position, 0.03f);
     }
 
-    public void RandomSpline()
+    public void TestStepDistance()
     {
-        splineManager.ClearSplines();
-        Vector3[] points = new Vector3[splinePoints];
-        for (int i = 0; i < splinePoints; i++)
+        float[] requested = new float[distanceTests];
+        float[] actual = new float[distanceTests];
+        float[] errors = new float[distanceTests];
+        float minError = float.MaxValue;
+        float maxError = float.MinValue;
+        float sumError = 0f;
+        for (int i = 0; i < distanceTests; i++)
         {
-            points[i] = new Vector3(Random.value * 2f - 1f, Random.value * 0.2f, Random.value * 2f - 1f);
+            float distance = Random.Range(minDistance, maxDistance);
+            Vector3 point = splineManager.ComputePoint(0, currentT);
+            StepResult step = splineManager.StepDistance(0, currentT, distance, stepResolution, useDichotomy);
+            requested[i] = distance;
+            actual[i] = (step.position - point).magnitude;
+            errors[i] = Mathf.Abs(requested[i] - actual[i]) / distance;
+            minError = Mathf.Min(minError, errors[i]);
+            maxError = Mathf.Max(maxError, errors[i]);
+            sumError += errors[i];
         }
-        splineManager.FromPoints(points);
+
+        float avgError = sumError / distanceTests;
+        Debug.Log($"Step Distance Test Results: Min Error = {minError*100}%, Max Error = {maxError*100}%, Avg Error = {avgError*100}%");
+    }
+
+    public void TestPathfind()
+    {
+        PathPosition start = new PathPosition { splineIndex = 0, isGoingForward = true };
+        PathPosition end = new PathPosition { splineIndex = 0, isGoingForward = false };
+
+        List<PathPosition> path = splineManager.Pathfind(start, end);
+        if (path != null)
+        {
+            foreach (PathPosition pos in path)
+            {
+                Debug.Log($"Spline Index: {pos.splineIndex}, Is Going Forward: {pos.isGoingForward}");
+            }
+        }
+        else
+        {
+            Debug.Log("No path found.");
+        }
     }
 }
 
@@ -108,10 +164,20 @@ public class SplineTestsEditor : Editor
         DrawDefaultInspector();
 
         SplineTests splineTests = (SplineTests)target;
-        if (GUILayout.Button("Random Spline"))
+
+        GUI.enabled = splineTests.splineManager != null;
+
+        if (GUILayout.Button("Test Step Distance"))
         {
-            splineTests.RandomSpline();
+            splineTests.TestStepDistance();
         }
+
+        if (GUILayout.Button("Test Pathfind"))
+        {
+            splineTests.TestPathfind();
+        }
+
+        GUI.enabled = true;
     }
 }
 #endif
