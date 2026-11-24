@@ -11,6 +11,7 @@ public class RailsGenerator : MonoBehaviour
     public float railGauge = 1.435f;
     public float railWidth = 0.13f;
     public float railHeight = 0.143f;
+    public float step = 5f;
     public MeshFilter railsMeshFilter;
 
     void Start()
@@ -18,7 +19,7 @@ public class RailsGenerator : MonoBehaviour
         splineManager = GetComponent<SplineManager>();
     }
 
-    public void GenerateRail(int splineIndex)
+    public void GenerateRail(int splineIndex, bool addToExisting)
     {
         if (splineManager.SplineCount() <= splineIndex) return;
 
@@ -30,24 +31,25 @@ public class RailsGenerator : MonoBehaviour
         float distance = 0f;
 
         bool reachedEnd = false;
+        int changedSplineIndex = splineIndex;
         while (t < 1f && !reachedEnd)
         {
-            StepResult result = splineManager.StepDistance(splineIndex, t, 0.5f);
-            if(result.reachedEnd) { reachedEnd = true; }
+            StepResult result = splineManager.StepDistance(changedSplineIndex, t, step);
+            if(result.reachedEnd) { reachedEnd = true; changedSplineIndex = result.newSplineIndex; }
 
             float nextT = result.newT;
 
             Vector3 p1 = splineManager.ComputePoint(splineIndex, t);
-            Vector3 p2 = splineManager.ComputePoint(splineIndex, nextT);
+            Vector3 p2 = splineManager.ComputePoint(changedSplineIndex, nextT);
 
             float segmentLength = Vector3.Distance(p1, p2);
             float endDistance = distance + segmentLength;
 
-            Vector3 n1 = splineManager.ComputeNormal(splineIndex, t).normalized;
-            Vector3 n2 = splineManager.ComputeNormal(splineIndex, nextT).normalized;
+            Vector3 n1 = splineManager.ComputeNormal(splineIndex, t);
+            Vector3 n2 = splineManager.ComputeNormal(changedSplineIndex, nextT);
 
             Vector3 up1 = splineManager.ComputeLocalUp(splineIndex, t);
-            Vector3 up2 = splineManager.ComputeLocalUp(splineIndex, nextT);
+            Vector3 up2 = splineManager.ComputeLocalUp(changedSplineIndex, nextT);
 
             Vector3 centerLeft1 = p1 - n1 * railGauge / 2f;
             Vector3 centerLeft2 = p2 - n2 * railGauge / 2f;
@@ -96,7 +98,18 @@ public class RailsGenerator : MonoBehaviour
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
 
-        GetComponent<RailwayMeshManager>().SetRails(mesh);
+        if (addToExisting)
+            GetComponent<RailwayMeshManager>().AddRails(mesh);
+        else
+            GetComponent<RailwayMeshManager>().SetRails(mesh);
+    }
+
+    public void GenerateAllRails()
+    {
+        for (int i = 0; i < splineManager.SplineCount(); i++)
+        {
+            GenerateRail(i, i > 0);
+        }
     }
 
     void AddQuad(List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, Vector3 a, Vector3 b, Vector3 c, Vector3 d, float distance, float endDistance)
@@ -137,15 +150,12 @@ public class RailsGeneratorEditor : Editor
 
         if (GUILayout.Button("Generate Rail 0"))
         {
-            railsGenerator.GenerateRail(0);
+            railsGenerator.GenerateRail(0, false);
         }
 
         if (GUILayout.Button("Generate All rails"))
         {
-            for (int i = 0; i < railsGenerator.splineManager.SplineCount(); i++)
-            {
-                railsGenerator.GenerateRail(i);
-            }
+            railsGenerator.GenerateAllRails();
         }
 
         GUI.enabled = true;

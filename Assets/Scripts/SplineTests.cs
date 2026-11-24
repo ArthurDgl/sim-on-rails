@@ -134,6 +134,25 @@ public class SplineTests : MonoBehaviour
         float avgError = sumError / distanceTests;
         Debug.Log($"Step Distance Test Results: Min Error = {minError*100}%, Max Error = {maxError*100}%, Avg Error = {avgError*100}%");
     }
+
+    public void TestPathfind()
+    {
+        PathPosition start = new PathPosition { splineIndex = 0, isGoingForward = true };
+        PathPosition end = new PathPosition { splineIndex = 0, isGoingForward = false };
+
+        List<PathPosition> path = splineManager.Pathfind(start, end);
+        if (path != null)
+        {
+            foreach (PathPosition pos in path)
+            {
+                Debug.Log($"Spline Index: {pos.splineIndex}, Is Going Forward: {pos.isGoingForward}");
+            }
+        }
+        else
+        {
+            Debug.Log("No path found.");
+        }
+    }
 }
 
 #if UNITY_EDITOR
@@ -151,6 +170,11 @@ public class SplineTestsEditor : Editor
         if (GUILayout.Button("Test Step Distance"))
         {
             splineTests.TestStepDistance();
+        }
+
+        if (GUILayout.Button("Test Pathfind"))
+        {
+            splineTests.TestPathfind();
         }
 
         GUI.enabled = true;

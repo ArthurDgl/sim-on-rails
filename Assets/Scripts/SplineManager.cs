@@ -4,8 +4,21 @@ using UnityEngine;
 public struct Spline
 {
     public List<Vector3> points;
-    public int previousSplineIndex;
-    public int nextSplineIndex;
+    public int startSwitchIndex;
+    public bool startIsSource;
+    public int endSwitchIndex;
+    public bool endIsSource;
+}
+
+public struct Switch
+{
+    public int sourceSplineIndex;
+    public bool sourceIsStart;
+    public int defaultDestinationIndex;
+    public bool defaultIsStart;
+    public int alternateDestinationIndex;
+    public bool alternateIsStart;
+    public bool useAlternate;
 }
 
 public struct StepResult
@@ -14,38 +27,39 @@ public struct StepResult
     public float newT;
     public bool reachedEnd;
     public int newSplineIndex;
+    public bool reverseDirection;
+}
+
+[System.Serializable]
+public struct PathPosition
+{
+    public int splineIndex;
+    public bool isGoingForward;
+
+    public PathPosition(int splineIndex, bool isGoingForward)
+    {
+        this.splineIndex = splineIndex;
+        this.isGoingForward = isGoingForward;
+    }
+
+    public PathPosition Default()
+    {
+        return new PathPosition(-1, true);
+    }
 }
 
 public class SplineManager : MonoBehaviour
 {
-    private List<Spline> splines; // Catmull Rom Splines with implicit end points or using neighbor splines for continuity
+    private List<Spline> splines;
+    private List<Switch> switches;
 
-    /// <summary>
-    /// Creates a new spline from the given points and adds it to the spline manager.
-    /// </summary>
-    /// <param name="points">The control points of the spline.</param>
-    /// <param name="previousSplineIndex">The index of the previous spline for continuity.</param>
-    /// <param name="nextSplineIndex">The index of the next spline for continuity.</param>
-    /// <param name="circular">Whether the spline is circular.</param>
-    /// <returns>The index of the newly added spline.</returns>
-    public int FromPoints(Vector3[] points, int previousSplineIndex = -1, int nextSplineIndex = -1, bool circular = false)
+    public int FromPoints(Vector3[] points)
     {
-        Spline spline = new Spline { points = new List<Vector3>(points), nextSplineIndex = nextSplineIndex, previousSplineIndex = previousSplineIndex };
+        Spline spline = new Spline { points = new List<Vector3>(points), startSwitchIndex = -1, endSwitchIndex = -1 };
         int index = AddSpline(spline);
-        if (circular)
-        {
-            spline.previousSplineIndex = index;
-            spline.nextSplineIndex = index;
-            splines[index] = spline;
-        }
         return index;
     }
 
-    /// <summary>
-    /// Adds an existing spline to the spline manager.
-    /// </summary>
-    /// <param name="spline">The spline to add.</param>
-    /// <returns>The index of the newly added spline.</returns>
     public int AddSpline(Spline spline)
     {
         if (splines == null)
@@ -56,10 +70,90 @@ public class SplineManager : MonoBehaviour
         return splines.Count - 1;
     }
 
-    /// <summary>
-    /// Removes the spline at the specified index from the spline manager.
-    /// </summary>
-    /// <param name="splineIndex">The index of the spline to remove.</param>
+    public int ConnectSplines(int sourceSplineIndex, bool sourceIsStart, int destinationSplineIndex, bool destinationIsStart, int alternateDestinationIndex = -1, bool alternateIsStart = false)
+    {
+        Switch sw = new Switch
+        {
+            sourceSplineIndex = sourceSplineIndex,
+            sourceIsStart = sourceIsStart,
+            defaultDestinationIndex = destinationSplineIndex,
+            defaultIsStart = destinationIsStart,
+            alternateDestinationIndex = alternateDestinationIndex,
+            alternateIsStart = alternateIsStart,
+            useAlternate = false
+        };
+        return AddSwitch(sw);
+    }
+
+    public int AddSwitch(Switch sw)
+    {
+        if (switches == null)
+        {
+            switches = new List<Switch>();
+        }
+        switches.Add(sw);
+        int index = switches.Count - 1;
+        ApplySwitch(sw);
+        return index;
+    }
+
+    public void ApplySwitch(Switch sw)
+    {
+        int index = switches.IndexOf(sw);
+        int sourceSplineIndex = sw.sourceSplineIndex;
+        bool sourceIsStart = sw.sourceIsStart;
+        int destinationSplineIndex = sw.defaultDestinationIndex;
+        bool destinationIsStart = sw.defaultIsStart;
+        int alternateDestinationIndex = sw.alternateDestinationIndex;
+        bool alternateIsStart = sw.alternateIsStart;
+
+        if (sourceIsStart)
+        {
+            Spline sourceSpline = splines[sourceSplineIndex];
+            sourceSpline.startSwitchIndex = index;
+            sourceSpline.startIsSource = true;
+            splines[sourceSplineIndex] = sourceSpline;
+        }
+        else
+        {
+            Spline sourceSpline = splines[sourceSplineIndex];
+            sourceSpline.endSwitchIndex = index;
+            sourceSpline.endIsSource = true;
+            splines[sourceSplineIndex] = sourceSpline;
+        }
+
+        if (destinationIsStart)
+        {
+            Spline destinationSpline = splines[destinationSplineIndex];
+            destinationSpline.startSwitchIndex = index;
+            destinationSpline.startIsSource = false;
+            splines[destinationSplineIndex] = destinationSpline;
+        }
+        else
+        {
+            Spline destinationSpline = splines[destinationSplineIndex];
+            destinationSpline.endSwitchIndex = index;
+            destinationSpline.endIsSource = false;
+            splines[destinationSplineIndex] = destinationSpline;
+        }
+
+        if (alternateDestinationIndex != -1)
+        {
+            Spline alternateSpline = splines[alternateDestinationIndex];
+            if (alternateIsStart)
+            {
+                alternateSpline.startSwitchIndex = index;
+                alternateSpline.startIsSource = false;
+            }
+            else
+            {
+                alternateSpline.endSwitchIndex = index;
+                alternateSpline.endIsSource = false;
+            }
+            splines[alternateDestinationIndex] = alternateSpline;
+        }
+    }
+
     public void RemoveSpline(int splineIndex)
     {
         if (splines == null || splineIndex < 0 || splineIndex >= splines.Count)
@@ -69,9 +163,6 @@ public class SplineManager : MonoBehaviour
         splines.RemoveAt(splineIndex);
     }
 
-    /// <summary>
-    /// Clears all splines from the spline manager.
-    /// </summary>
     public void ClearSplines()
     {
         if (splines != null)
@@ -80,71 +171,176 @@ public class SplineManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Returns the number of splines in the spline manager.
-    /// </summary>
-    /// <returns>The number of splines in the spline manager.</returns>
     public int SplineCount()
     {
         return splines != null ? splines.Count : 0;
     }
 
-    /// <summary>
-    /// Returns the spline at the specified index.
-    /// </summary>
-    /// <param name="splineIndex">The index of the spline to retrieve.</param>
-    /// <returns>The spline at the specified index.</returns>
     public Spline GetSpline(int splineIndex)
     {
         return splines[splineIndex];
     }
 
-    /// <summary>
-    /// Computes the tangent vector at the specified parameter t on the given spline.
-    /// </summary>
-    /// <param name="splineIndex">The index of the spline.</param>
-    /// <param name="t">The parameter along the spline (0 to 1).</param>
-    /// <returns>The tangent vector at the specified parameter.</returns>
-    public Vector3 ComputeTangent(int splineIndex, float t)
+    public Vector3 ComputeTangent(int splineIndex, float t, bool isReversed = false)
     {
         Spline spline = splines[splineIndex];
         GetSegment(spline, t, out Vector3 p0, out Vector3 p1, out Vector3 p2, out Vector3 p3, out float localT);
 
-        return ComputeTangentOnSegment(p0, p1, p2, p3, localT).normalized;
+        Vector3 tangent = ComputeTangentOnSegment(p0, p1, p2, p3, localT).normalized;
+        return isReversed ? -tangent : tangent;
     }
 
-    /// <summary>
-    /// Computes the normal vector at the specified parameter t on the given spline.
-    /// </summary>
-    /// <param name="splineIndex">The index of the spline.</param>
-    /// <param name="t">The parameter along the spline (0 to 1).</param>
-    /// <returns>The normal vector at the specified parameter.</returns>
     public Vector3 ComputeNormal(int splineIndex, float t)
     {
-        Vector3 tangent = ComputeTangent(splineIndex, t);
+        Vector3 tangent = ComputeTangent(splineIndex, t, false);
         return Vector3.Cross(tangent, Vector3.up).normalized;
     }
 
-    /// <summary>
-    /// Computes the local up vector at the specified parameter t on the given spline.
-    /// </summary>
-    /// <param name="splineIndex">The index of the spline.</param>
-    /// <param name="t">The parameter along the spline (0 to 1).</param>
-    /// <returns>The local up vector at the specified parameter.</returns>
     public Vector3 ComputeLocalUp(int splineIndex, float t)
     {
-        Vector3 tangent = ComputeTangent(splineIndex, t);
+        Vector3 tangent = ComputeTangent(splineIndex, t, false);
         Vector3 normal = Vector3.Cross(tangent, Vector3.up).normalized;
         return Vector3.Cross(normal, tangent).normalized;
     }
 
-    /// <summary>
-    /// Approximates the step distance along the spline.
-    /// </summary>
-    /// <param name="splineIndex">The index of the spline.</param>
-    /// <param name="t">The parameter along the spline (0 to 1).</param>
-    /// <param name="distance">The distance to step.</param>
-    /// <returns>The approximate step parameter along the spline.</returns>
+    public float GetDistanceAlongPath(List<PathPosition> path, float currentT = 0f, float lastT = 1f)
+    {
+        float distance = 0f;
+        for (int i = 0; i < path.Count; i++)
+        {
+            float startT = i == 0 ? currentT : 0f;
+            float endT = i == path.Count - 1 ? lastT : 1f;
+            distance += ApproximateSplineLength(path[i].splineIndex, startT: startT, endT: endT);
+        }
+        return distance;
+    }
+
+    public float Heuristic(PathPosition spline, PathPosition endSpline)
+    {
+        Vector3 startPoint = ComputePoint(spline.splineIndex, 0.5f);
+        Vector3 endPoint = ComputePoint(endSpline.splineIndex, 0.5f);
+        return Vector3.Distance(startPoint, endPoint);
+    }
+
+    public List<PathPosition> GetNeighbors(PathPosition current)
+    {
+        List<PathPosition> neighbors = new List<PathPosition>();
+
+        Spline spline = splines[current.splineIndex];
+        int switchIndex = current.isGoingForward ? spline.endSwitchIndex : spline.startSwitchIndex;
+        if (switchIndex < 0 || switchIndex >= switches.Count)
+        {
+            return neighbors;
+        }
+        Switch sw = switches[switchIndex];
+
+        if (current.isGoingForward ? spline.endIsSource : spline.startIsSource)
+        {
+            if (sw.defaultDestinationIndex >= 0)
+            {
+                neighbors.Add(new PathPosition { splineIndex = sw.defaultDestinationIndex, isGoingForward = sw.defaultIsStart });
+            }
+            if (sw.alternateDestinationIndex >= 0)
+            {
+                neighbors.Add(new PathPosition { splineIndex = sw.alternateDestinationIndex, isGoingForward = sw.alternateIsStart });
+            }
+        }
+        else
+        {
+            if (sw.sourceSplineIndex >= 0)
+            {
+                neighbors.Add(new PathPosition { splineIndex = sw.sourceSplineIndex, isGoingForward = sw.sourceIsStart });
+            }
+        }
+        return neighbors;
+    }
+
+    public List<PathPosition> ReconstructPath(Dictionary<PathPosition, PathPosition> cameFrom, PathPosition current)
+    {
+        List<PathPosition> totalPath = new List<PathPosition> { current };
+        while (cameFrom.ContainsKey(current))
+        {
+            current = cameFrom[current];
+            totalPath.Insert(0, current);
+        }
+        return totalPath;
+    }
+
+    public List<PathPosition> Pathfind(PathPosition startSpline, PathPosition endSpline)
+    {
+        HashSet<PathPosition> known = new HashSet<PathPosition>();
+        known.Add(startSpline);
+
+        Dictionary<PathPosition, PathPosition> cameFrom = new Dictionary<PathPosition, PathPosition>();
+
+        Dictionary<PathPosition, float> gScore = new Dictionary<PathPosition, float>();
+        for (int i = 0; i < splines.Count; i++)
+        {
+            gScore[new PathPosition { splineIndex = i, isGoingForward = true }] = float.PositiveInfinity;
+            gScore[new PathPosition { splineIndex = i, isGoingForward = false }] = float.PositiveInfinity;
+        }
+        gScore[startSpline] = 0f;
+
+        Dictionary<PathPosition, float> fScore = new Dictionary<PathPosition, float>();
+        for (int i = 0; i < splines.Count; i++)
+        {
+            fScore[new PathPosition { splineIndex = i, isGoingForward = true }] = float.PositiveInfinity;
+            fScore[new PathPosition { splineIndex = i, isGoingForward = false }] = float.PositiveInfinity;
+        }
+        fScore[startSpline] = Heuristic(startSpline, endSpline);
+
+        while (known.Count > 0)
+        {
+            PathPosition current = new PathPosition().Default();
+            float minFScore = float.PositiveInfinity;
+            foreach (PathPosition node in known)
+            {
+                if (fScore[node] < minFScore)
+                {
+                    minFScore = fScore[node];
+                    current = node;
+                }
+            }
+
+            if (current.Equals(endSpline))
+            {
+                return ReconstructPath(cameFrom, current);
+            }
+
+            known.Remove(current);
+            float currentLength = ApproximateSplineLength(current.splineIndex);
+            foreach (PathPosition neighbor in GetNeighbors(current))
+            {
+                float tentativeGScore = gScore[current] + currentLength;
+                if (tentativeGScore < gScore[neighbor])
+                {
+                    cameFrom[neighbor] = current;
+                    gScore[neighbor] = tentativeGScore;
+                    fScore[neighbor] = gScore[neighbor] + Heuristic(neighbor, endSpline);
+                    known.Add(neighbor);
+                }
+            }
+        }
+        return null;
+    }
+
+    public float ApproximateSplineLength(int splineIndex, int resolution = 100, float startT = 0f, float endT = 1f)
+    {
+        Spline spline = splines[splineIndex];
+        List<Vector3> points = spline.points;
+
+        float length = 0f;
+        Vector3 previousPoint = ComputePoint(splineIndex, startT);
+        for (int i = 1; i <= resolution; i++)
+        {
+            float t = startT + (endT - startT) * (i / (float)resolution);
+            Vector3 currentPoint = ComputePoint(splineIndex, t);
+            length += Vector3.Distance(currentPoint, previousPoint);
+            previousPoint = currentPoint;
+        }
+        return length;
+    }
+
     public float StepDistanceApprox(int splineIndex, float t, float distance)
     {
         Spline spline = splines[splineIndex];
@@ -162,17 +358,6 @@ public class SplineManager : MonoBehaviour
         return globalStepT;
     }
 
-    /// <summary>
-    /// Performs a grid search to find the point along the spline at the specified distance.
-    /// </summary>
-    /// <param name="splineIndex">The index of the spline.</param>
-    /// <param name="t">The parameter along the spline (0 to 1).</param>
-    /// <param name="distance">The distance to step.</param>
-    /// <param name="start">The start parameter for the search.</param>
-    /// <param name="end">The end parameter for the search.</param>
-    /// <param name="resolution">The number of steps in the grid search.</param>
-    /// <param name="useStraightLineDistance">Whether to measure direct displacement instead of distance along the curve.</param>
-    /// <returns>A tuple containing the point and the parameter at the specified distance.</returns>
     public (Vector3, float) GridSearch(int splineIndex, float t, float distance, float start, float end, int resolution, bool useStraightLineDistance = false)
     {
         float accumulatedDistance = 0f;
@@ -196,17 +381,6 @@ public class SplineManager : MonoBehaviour
         return (ComputePoint(splineIndex, t + end), end);
     }
 
-    /// <summary>
-    /// Performs a binary search to find the point along the spline at the specified distance.
-    /// </summary>
-    /// <param name="splineIndex">The index of the spline.</param>
-    /// <param name="t">The parameter along the spline (0 to 1).</param>
-    /// <param name="distance">The distance to step.</param>
-    /// <param name="start">The start parameter for the search.</param>
-    /// <param name="end">The end parameter for the search.</param>
-    /// <param name="tolerance">The tolerance for the binary search.</param>
-    /// <param name="useStraightLineDistance">Whether to measure direct displacement instead of distance along the curve.</param>
-    /// <returns>A tuple containing the point and the parameter at the specified distance.</returns>
     public (Vector3, float) BinarySearch(
         int splineIndex,
         float t,
@@ -264,20 +438,7 @@ public class SplineManager : MonoBehaviour
         return (ComputePoint(splineIndex, t + stepT), stepT);
     }
 
-    /// <summary>
-    /// Steps along the spline by the specified distance.
-    /// </summary>
-    /// <param name="splineIndex">The index of the spline.</param>
-    /// <param name="t">The parameter along the spline (0 to 1).</param>
-    /// <param name="distance">The distance to step.</param>
-    /// <param name="resolution">The resolution for the search.</param>
-    /// <param name="useDichotomy">Whether to use dichotomy (binary search) for refinement.</param>
-    /// <param name="useStraightLineDistance">Whether to measure direct displacement instead of distance along the curve.</param>
-    /// <returns>A StepResult containing the new position and parameter along the spline.</returns>
-    /// <remarks>
-    /// If the step reaches the end of the spline, the StepResult will indicate whether the end was reached and provide the new spline index if applicable.
-    /// </remarks>
-    public StepResult StepDistance(int splineIndex, float t, float distance, int resolution = 10, bool useDichotomy = true, bool useStraightLineDistance = false)
+    public StepResult StepDistance(int splineIndex, float t, float distance, int resolution = 10, bool useDichotomy = true, bool useStraightLineDistance = false, int preferSplineIndex = -1, int preferDirection = -1)
     {
         float globalStepT = StepDistanceApprox(splineIndex, t, distance);
         
@@ -291,17 +452,58 @@ public class SplineManager : MonoBehaviour
         float newT = t + stepT;
         if (newT >= 0f && newT <= 1f)
         {
-            return new StepResult { position = position, newT = newT, reachedEnd = false, newSplineIndex = splineIndex };
+            return new StepResult { position = position, newT = newT, reachedEnd = false, newSplineIndex = splineIndex, reverseDirection = false };
         }
 
         Spline spline = splines[splineIndex];
         bool forward = newT > 1f;
         float boundaryT = forward ? 1f : 0f;
-        int neighbor = forward ? spline.nextSplineIndex : spline.previousSplineIndex;
+        int neighbor;
+        bool neighborIsReversed;
+        if (forward)
+        {
+            Switch sw = switches[spline.endSwitchIndex];
+            if (spline.endIsSource)
+            {
+                bool useAlternate = sw.useAlternate && sw.defaultDestinationIndex != preferSplineIndex || sw.alternateDestinationIndex == preferSplineIndex;
+                if (preferDirection != -1 && sw.defaultDestinationIndex == sw.alternateDestinationIndex)
+                {
+                    bool preferForward = preferDirection == 1;
+                    useAlternate = preferForward ^ sw.defaultIsStart;
+                }
+                neighbor = useAlternate ? sw.alternateDestinationIndex : sw.defaultDestinationIndex;
+                neighborIsReversed = useAlternate ? !sw.alternateIsStart : !sw.defaultIsStart;
+            }
+            else
+            {
+                neighbor = sw.sourceSplineIndex;
+                neighborIsReversed = !sw.sourceIsStart;
+            }
+        }
+        else
+        {
+            Switch sw = switches[spline.startSwitchIndex];
+            if (spline.startIsSource)
+            {
+                bool useAlternate = sw.useAlternate && sw.defaultDestinationIndex != preferSplineIndex || sw.alternateDestinationIndex == preferSplineIndex;
+                if (preferDirection != -1 && sw.defaultDestinationIndex == sw.alternateDestinationIndex)
+                {
+                    bool preferForward = preferDirection == 1;
+                    useAlternate = preferForward ^ sw.defaultIsStart;
+                }
+                neighbor = useAlternate ? sw.alternateDestinationIndex : sw.defaultDestinationIndex;
+                neighborIsReversed = useAlternate ? sw.alternateIsStart : sw.defaultIsStart;
+            }
+            else
+            {
+                neighbor = sw.sourceSplineIndex;
+                neighborIsReversed = sw.sourceIsStart;
+            }
+        }
 
         if (neighbor < 0 || neighbor >= splines.Count)
         {
-            return new StepResult { position = ComputePoint(splineIndex, boundaryT), newT = boundaryT, reachedEnd = true, newSplineIndex = -1 };
+            return new StepResult { position = ComputePoint(splineIndex, boundaryT), newT = boundaryT, reachedEnd = true, newSplineIndex = -1, reverseDirection = false };
         }
 
         float toBoundary = 0f;
@@ -317,26 +519,22 @@ public class SplineManager : MonoBehaviour
         }
 
         float remaining = Mathf.Max(Mathf.Abs(distance) - toBoundary, 0f) * Mathf.Sign(distance);
-        float neighborT = forward ? 0f : 1f;
+        if (neighborIsReversed)
+        {
+            remaining = -remaining;
+        }
+        float neighborT = forward != neighborIsReversed ? 0f : 1f;
         if (Mathf.Abs(remaining) < 0.000001f)
         {
-            return new StepResult { position = previous, newT = neighborT, reachedEnd = true, newSplineIndex = neighbor };
+            return new StepResult { position = previous, newT = neighborT, reachedEnd = true, newSplineIndex = neighbor, reverseDirection = neighborIsReversed };
         }
 
         StepResult result = StepDistance(neighbor, neighborT, remaining, resolution, useDichotomy, useStraightLineDistance);
         result.reachedEnd = true;
+        result.reverseDirection ^= neighborIsReversed;
         return result;
     }
 
-    /// <summary>
-    /// Samples points along the specified spline.
-    /// </summary>
-    /// <param name="splineIndex">The index of the spline.</param>
-    /// <param name="sampleCount">The number of points to sample.</param>
-    /// <returns>An array of sampled points along the spline.</returns>
-    /// <remarks>
-    /// The points are evenly distributed along the parameter t of the spline, not necessarily along the arc length.
-    /// </remarks>
     public Vector3[] SamplePoints(int splineIndex, int sampleCount)
     {
         Vector3[] samples = new Vector3[sampleCount];
@@ -348,15 +546,6 @@ public class SplineManager : MonoBehaviour
         return samples;
     }
 
-    /// <summary>
-    /// Computes the point on the specified spline at the given parameter t.
-    /// </summary>
-    /// <param name="splineIndex">The index of the spline.</param>
-    /// <param name="t">The parameter along the spline (0 to 1).</param>
-    /// <returns>The computed point on the spline.</returns>
-    /// <remarks>
-    /// The parameter t is clamped between 0 and 1. The point is computed using the Catmull-Rom spline formula.
-    /// </remarks>
     public Vector3 ComputePoint(int splineIndex, float t)
     {
         t = Mathf.Clamp01(t);
@@ -366,19 +555,13 @@ public class SplineManager : MonoBehaviour
         return ComputeOnSegment(p0, p1, p2, p3, localT);
     }
 
-    /// <summary>
-    /// Retrieves the segment of the spline corresponding to the given parameter t.
-    /// </summary>
-    /// <param name="spline">The spline to evaluate.</param>
-    /// <param name="t">The parameter along the spline (0 to 1).</param>
-    /// <param name="p0">The first control point of the segment.</param>
-    /// <param name="p1">The second control point of the segment.</param>
-    /// <param name="p2">The third control point of the segment.</param>
-    /// <param name="p3">The fourth control point of the segment.</param>
-    /// <param name="localT">The local parameter within the segment (0 to 1).</param>
-    /// <remarks>
-    /// The method determines the appropriate segment of the spline and calculates the local parameter within that segment.
-    /// </remarks>
+    // Source tangent at the junction, oriented away from the source.
+    private Vector3 SwitchDirection(Switch sw)
+    {
+        Vector3 tangent = ComputeTangent(sw.sourceSplineIndex, sw.sourceIsStart ? 0f : 1f);
+        return sw.sourceIsStart ? -tangent : tangent;
+    }
+
     private void GetSegment(Spline spline, float t, out Vector3 p0, out Vector3 p1, out Vector3 p2, out Vector3 p3, out float localT)
     {
         List<Vector3> points = spline.points;
@@ -392,9 +575,10 @@ public class SplineManager : MonoBehaviour
         {
             p0 = points[segmentIndex - 1];
         }
-        else if (spline.previousSplineIndex >= 0 && spline.previousSplineIndex < splines.Count)
+        else if (spline.startSwitchIndex >= 0 && spline.startSwitchIndex < switches.Count && !spline.startIsSource)
         {
-            p0 = splines[spline.previousSplineIndex].points[^2];
+            Vector3 d = SwitchDirection(switches[spline.startSwitchIndex]);
+            p0 = points[1] - 2f * (points[1] - points[0]).magnitude * d;
         }
         else
         {
@@ -408,9 +592,10 @@ public class SplineManager : MonoBehaviour
         {
             p3 = points[segmentIndex + 2];
         }
-        else if (spline.nextSplineIndex >= 0 && spline.nextSplineIndex < splines.Count)
+        else if (spline.endSwitchIndex >= 0 && spline.endSwitchIndex < switches.Count && !spline.endIsSource)
         {
-            p3 = splines[spline.nextSplineIndex].points[1];
+            Vector3 d = SwitchDirection(switches[spline.endSwitchIndex]);
+            p3 = points[^2] - 2f * (points[^1] - points[^2]).magnitude * d;
         }
         else
         {
@@ -418,18 +603,6 @@ public class SplineManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Computes the point on a Catmull-Rom spline segment given the control points and local parameter.
-    /// </summary>
-    /// <param name="p0">The first control point of the segment.</param>
-    /// <param name="p1">The second control point of the segment.</param>
-    /// <param name="p2">The third control point of the segment.</param>
-    /// <param name="p3">The fourth control point of the segment.</param>
-    /// <param name="localT">The local parameter within the segment (0 to 1).</param>
-    /// <returns>The computed point on the segment.</returns>
-    /// <remarks>
-    /// The method uses the Catmull-Rom spline formula to interpolate the point based on the local parameter.
-    /// </remarks>
     private Vector3 ComputeOnSegment(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float localT)
     {
         float t2 = localT * localT;
@@ -440,18 +613,6 @@ public class SplineManager : MonoBehaviour
                        (-p0 + 3f * p1 - 3f * p2 + p3) * t3);
     }
 
-    /// <summary>
-    /// Computes the tangent vector on a Catmull-Rom spline segment given the control points and local parameter.
-    /// </summary>
-    /// <param name="p0">The first control point of the segment.</param>
-    /// <param name="p1">The second control point of the segment.</param>
-    /// <param name="p2">The third control point of the segment.</param>
-    /// <param name="p3">The fourth control point of the segment.</param>
-    /// <param name="localT">The local parameter within the segment (0 to 1).</param>
-    /// <returns>The computed tangent vector on the segment.</returns>
-    /// <remarks>
-    /// The method uses the derivative of the Catmull-Rom spline formula to compute the tangent based on the local parameter.
-    /// </remarks>
     private Vector3 ComputeTangentOnSegment(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float localT)
     {
         float t2 = localT * localT;

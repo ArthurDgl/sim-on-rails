@@ -49,7 +49,51 @@ public class SplineGenerator : MonoBehaviour
         points[6] = new Vector3(-2f, 0f, 0f) * scale;
         points[7] = new Vector3(-1f, 0f, 1f) * scale;
         points[8] = new Vector3(0f, 0f, 1f) * scale;
-        splineManager.FromPoints(points, 0, 0, true);
+        int index = splineManager.FromPoints(points);
+        splineManager.ConnectSplines(index, true, index, false);
+    }
+
+    public void Create2ParallelTracks()
+    {
+        splineManager.ClearSplines();
+        Vector3[] points1 = new Vector3[2];
+        points1[0] = new Vector3(0f, 0f, 0f) * scale;
+        points1[1] = new Vector3(1f, 0f, 0f) * scale;
+
+        Vector3[] points2 = new Vector3[2];
+        points2[0] = new Vector3(0f, 0f, 1f) * scale;
+        points2[1] = new Vector3(1f, 0f, 1f) * scale;
+
+        splineManager.FromPoints(points1);
+        splineManager.FromPoints(points2);
+    }
+
+    public void CreateMultiTestTrack()
+    {
+        splineManager.ClearSplines();
+        Vector3[] points1 = new Vector3[5];
+        points1[0] = new Vector3(-1f, 0f, 0f) * scale;
+        points1[1] = new Vector3(-2f, 0f, 1f) * scale;
+        points1[2] = new Vector3(-3f, 0f, 0f) * scale;
+        points1[3] = new Vector3(-2f, 0f, -1f) * scale;
+        points1[4] = new Vector3(-1f, 0f, 0f) * scale;
+        int left = splineManager.FromPoints(points1);
+
+        Vector3[] points2 = new Vector3[2];
+        points2[0] = new Vector3(-1f, 0f, 0f) * scale;
+        points2[1] = new Vector3(1f, 0f, 0f) * scale;
+        int middle = splineManager.FromPoints(points2);
+
+        Vector3[] points3 = new Vector3[5];
+        points3[0] = new Vector3(1f, 0f, 0f) * scale;
+        points3[1] = new Vector3(2f, 0f, 1f) * scale;
+        points3[2] = new Vector3(3f, 0f, 0f) * scale;
+        points3[3] = new Vector3(2f, 0f, -1f) * scale;
+        points3[4] = new Vector3(1f, 0f, 0f) * scale;
+        int right = splineManager.FromPoints(points3);
+
+        splineManager.ConnectSplines(middle, true, left, true, left, false);
+        splineManager.ConnectSplines(middle, false, right, true, right, false);
     }
 }
 
@@ -78,6 +122,16 @@ public class SplineGeneratorEditor : Editor
         if (GUILayout.Button("Create Test Track"))
         {
             splineGenerator.CreateTestTrack();
+        }
+
+        if (GUILayout.Button("Create 2 Parallel Tracks"))
+        {
+            splineGenerator.Create2ParallelTracks();
+        }
+        
+        if (GUILayout.Button("Create Multi Test Track"))
+        {
+            splineGenerator.CreateMultiTestTrack();
         }
 
         GUI.enabled = true;

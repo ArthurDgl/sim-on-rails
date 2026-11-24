@@ -393,11 +393,13 @@ GameObject:
   m_Component:
   - component: {fileID: 413440688}
   - component: {fileID: 413440687}
-  - component: {fileID: 413440689}
   - component: {fileID: 413440691}
+  - component: {fileID: 413440689}
   - component: {fileID: 413440690}
+  - component: {fileID: 413440695}
   - component: {fileID: 413440693}
   - component: {fileID: 413440692}
+  - component: {fileID: 413440694}
   m_Layer: 0
   m_Name: Splines
   m_TagString: Untagged
@@ -473,6 +475,8 @@ MonoBehaviour:
   railGauge: 1.435
   railWidth: 0.13
   railHeight: 0.143
+  step: 5
+  railsMeshFilter: {fileID: 0}
 --- !u!114 &413440691
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -545,6 +549,38 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 413440686}
   m_Mesh: {fileID: 0}
+--- !u!114 &413440694
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 413440686}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 53da92d61ec8b62a1a201f381b2cdbb8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RailwayMeshManager
+  railsMaterial: {fileID: 2100000, guid: cdddea82620a7aa90ba7d7b78161a84f, type: 2}
+  tiesMaterial: {fileID: 2100000, guid: 47f476d270ba64959b58e4d6d9503a29, type: 2}
+--- !u!114 &413440695
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 413440686}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 89bff736f01eab7a696d86f229743f7b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TiesGenerator
+  splineManager: {fileID: 413440687}
+  tieSpacing: 0.5
+  tieHeight: 0.178
+  tieLength: 2.438
+  tieWidth: 0.229
+  railsMeshFilter: {fileID: 0}
 --- !u!1 &804655829
 GameObject:
   m_ObjectHideFlags: 0
@@ -733,7 +769,7 @@ Transform:
   m_GameObject: {fileID: 980857999}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -1.5, z: 0}
+  m_LocalPosition: {x: 0, y: -0.178, z: 0}
   m_LocalScale: {x: 1000, y: 1000, z: 1000}
   m_ConstrainProportionsScale: 1
   m_Children: []
@@ -749,6 +785,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1194421470}
   - component: {fileID: 1194421471}
+  - component: {fileID: 1194421472}
   m_Layer: 0
   m_Name: TestTrain
   m_TagString: Untagged
@@ -785,19 +822,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MultiTrain
   splineManager: {fileID: 413440687}
   attached: 0
-  attachedTo: 0
+  history:
+    splineIndices: 
+    isReversed: 
   currentT: 0
   velocity: 0
   acceleration: 0
   mass: 1000
   damping: 0.05
+  autoDrive: 0
   throttle: 0
-  maxThrottle: 10000
+  maxThrottle: 50000
   brake: 0
-  maxBrake: 5000
-  carLength: 8
-  numberOfCars: 3
-  carSpacing: 10
+  maxBrake: 500
+  brakeStoppingVelocity: 0.1
+  maxStoppingDistanceMargin: 1
+  minStoppingDistanceMargin: 0.2
+  carLength: 15
+  pathFollowing:
+    path: []
+    pathStops: []
+  goal:
+    splineIndex: 0
+    isGoingForward: 1
+  realGoal:
+    position:
+      splineIndex: 0
+      isGoingForward: 1
+    stopT: 0
+  numberOfCars: 20
+  carSpacing: 16
+--- !u!114 &1194421472
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1194421469}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 428ee89b345799e27a12c09735d23cc4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  locomotivePrefab: {fileID: 2345134398676010016, guid: 5769f7dc1debcb7609d19f097e6c887e, type: 3}
+  carPrefab: {fileID: 7248108964622092996, guid: e69aa094662b62355980b711b8c65ee8, type: 3}
 --- !u!1 &1918940701
 GameObject:
   m_ObjectHideFlags: 0
@@ -843,16 +911,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: af881e30e5a7a17e99f221584ffd1efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RTSCameraController
-  moveSpeed: 20
-  fastMoveMultiplier: 2
+  moveSpeed: 40
+  fastMoveMultiplier: 5
   movementSmoothing: 8
   cameraPivot: {fileID: 804655830}
-  zoomSpeed: 10
+  zoomSpeed: 100
   minZoom: 5
-  maxZoom: 40
+  maxZoom: 200
   useMiddleMouseRotation: 1
   rotationSpeed: 15
-  minPitch: 0
+  minPitch: 2
   maxPitch: 90
   edgeScrolling: 0
   edgeSize: 15
