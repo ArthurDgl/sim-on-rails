@@ -170,9 +170,9 @@ public class Train : MonoBehaviour
 
     public float brakeStoppingVelocity = 0.1f;
 
-    public float maxStoppingDistanceMargin = 0.5f;
+    public float maxStoppingDistanceMargin = 5f;
 
-    public float minStoppingDistanceMargin = 0.1f;
+    public float minStoppingDistanceMargin = 0.2f;
 
     public float carLength = 8f;
     
