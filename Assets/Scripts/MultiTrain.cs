@@ -37,6 +37,11 @@ public class MultiTrain : Train
         return mass * numberOfCars;
     }
 
+    public override float GetEffectiveMaxBrake()
+    {
+        return base.GetEffectiveMaxBrake() * numberOfCars;
+    }
+
     private int IterateOverLatterCars(Action<float, int> action, bool reverseReversed = true)
     {
         float lastT = currentT;
@@ -114,6 +119,11 @@ public class MultiTrainEditor : Editor
         if (GUILayout.Button("Pathfind to Goal"))
         {
             multiTrain.PathfindToGoal();
+        }
+
+        if (GUILayout.Button("Start Drive to Goal"))
+        {
+            multiTrain.StartDriveToGoal();
         }
     }
 }

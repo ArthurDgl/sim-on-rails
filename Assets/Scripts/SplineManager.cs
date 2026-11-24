@@ -203,6 +203,18 @@ public class SplineManager : MonoBehaviour
         return Vector3.Cross(normal, tangent).normalized;
     }
 
+    public float GetDistanceAlongPath(List<PathPosition> path, float currentT = 0f, float lastT = 1f)
+    {
+        float distance = 0f;
+        for (int i = 0; i < path.Count; i++)
+        {
+            float startT = i == 0 ? currentT : 0f;
+            float endT = i == path.Count - 1 ? lastT : 1f;
+            distance += ApproximateSplineLength(path[i].splineIndex, startT: startT, endT: endT);
+        }
+        return distance;
+    }
+
     public float Heuristic(PathPosition spline, PathPosition endSpline)
     {
         Vector3 startPoint = ComputePoint(spline.splineIndex, 0.5f);
@@ -312,16 +324,16 @@ public class SplineManager : MonoBehaviour
         return null;
     }
 
-    public float ApproximateSplineLength(int splineIndex, int resolution = 100)
+    public float ApproximateSplineLength(int splineIndex, int resolution = 100, float startT = 0f, float endT = 1f)
     {
         Spline spline = splines[splineIndex];
         List<Vector3> points = spline.points;
 
         float length = 0f;
-        Vector3 previousPoint = points[0];
+        Vector3 previousPoint = ComputePoint(splineIndex, startT);
         for (int i = 1; i <= resolution; i++)
         {
-            float t = i / (float)resolution;
+            float t = startT + (endT - startT) * (i / (float)resolution);
             Vector3 currentPoint = ComputePoint(splineIndex, t);
             length += Vector3.Distance(currentPoint, previousPoint);
             previousPoint = currentPoint;

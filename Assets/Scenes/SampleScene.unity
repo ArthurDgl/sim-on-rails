@@ -830,16 +830,26 @@ MonoBehaviour:
   acceleration: 0
   mass: 1000
   damping: 0.05
+  autoDrive: 0
   throttle: 0
   maxThrottle: 50000
   brake: 0
-  maxBrake: 1000
+  maxBrake: 500
+  brakeStoppingVelocity: 0.1
+  maxStoppingDistanceMargin: 1
+  minStoppingDistanceMargin: 0.2
   carLength: 15
   pathFollowing:
     path: []
+    pathStops: []
   goal:
     splineIndex: 0
-    isGoingForward: 0
+    isGoingForward: 1
+  realGoal:
+    position:
+      splineIndex: 0
+      isGoingForward: 1
+    stopT: 0
   numberOfCars: 20
   carSpacing: 16
 --- !u!114 &1194421472

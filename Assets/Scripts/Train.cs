@@ -28,9 +28,29 @@ public struct TrainGraphics
 }
 
 [System.Serializable]
+public struct PathStop
+{
+    public PathPosition position;
+    public float stopT;
+
+    public PathStop(PathPosition position, float stopT)
+    {
+        this.position = position;
+        this.stopT = stopT;
+    }
+
+    public PathStop Default()
+    {
+        return new PathStop(new PathPosition().Default(), 0f);
+    }
+}
+
+[System.Serializable]
 public class PathFollowing
 {
     public List<PathPosition> path = new List<PathPosition>();
+
+    public List<PathStop> pathStops = new List<PathStop>();
 
     public PathPosition CurrentPosition
     {
@@ -42,14 +62,40 @@ public class PathFollowing
         get { return path.Count > 1 ? path[1] : new PathPosition().Default(); }
     }
 
+    public PathStop NextStop
+    {
+        get { return pathStops.Count > 0 ? pathStops[0] : new PathStop().Default(); }
+    }
+
     public PathFollowing()
     {
         path = new List<PathPosition>();
+        pathStops = new List<PathStop>();
     }
 
     public PathFollowing(List<PathPosition> initialPath)
     {
         path = initialPath ?? new List<PathPosition>();
+        pathStops = new List<PathStop>();
+    }
+
+    public bool HasNextStop()
+    {
+        return pathStops.Count > 0;
+    }
+
+    public List<PathPosition> GetPathToNextStop()
+    {
+        List<PathPosition> pathToNextStop = new List<PathPosition>();
+        foreach (PathPosition pos in path)
+        {
+            pathToNextStop.Add(pos);
+            if (pos.Equals(NextStop.position))
+            {
+                break;
+            }
+        }
+        return pathToNextStop;
     }
 
     public bool AdvancePathIsDone()
@@ -58,7 +104,7 @@ public class PathFollowing
         {
             path.RemoveAt(0);
 
-            if (path.Count <= 1)
+            if (path.Count == 0)
             {
                 Debug.Log("Path has been fully advanced.");
                 return true;
@@ -110,6 +156,8 @@ public class Train : MonoBehaviour
 
     public float damping = 0.05f;
 
+    public bool autoDrive = false;
+
     [Range(0f, 1f)]
     public float throttle = 0f;
 
@@ -120,6 +168,12 @@ public class Train : MonoBehaviour
 
     public float maxBrake = 5000f;
 
+    public float brakeStoppingVelocity = 0.1f;
+
+    public float maxStoppingDistanceMargin = 0.5f;
+
+    public float minStoppingDistanceMargin = 0.1f;
+
     public float carLength = 8f;
     
     protected int maxUsedHistoryDepth = 0;
@@ -127,6 +181,8 @@ public class Train : MonoBehaviour
     public PathFollowing pathFollowing = new PathFollowing();
 
     public PathPosition goal;
+
+    public PathStop realGoal;
 
     void Awake()
     {
@@ -182,6 +238,25 @@ public class Train : MonoBehaviour
         pathFollowing = newPathFollowing;
     }
 
+    public void StartDriveToGoal()
+    {
+        if (splineManager == null) return;
+        if (!attached) return;
+
+        List<PathPosition> pathToGoal = splineManager.Pathfind(GetCurrentPathPosition(), realGoal.position);
+
+        if (pathToGoal == null || pathToGoal.Count == 0)
+        {
+            Debug.LogWarning("No path found to goal.");
+            return;
+        }
+        else
+        {
+            SetPathFollowing(new PathFollowing(pathToGoal));
+            pathFollowing.pathStops.Add(realGoal);
+        }
+    }
+
     public void PathfindToGoal()
     {
         if (splineManager == null) return;
@@ -233,9 +308,13 @@ public class Train : MonoBehaviour
         if (splineManager == null) return;
         if (!attached) return;
 
+        AutoDrive();
+
         maxUsedHistoryDepth = 0;
 
         ApplyForces();
+
+        ApplyStopCondition();
 
         if (maxUsedHistoryDepth < history.splineIndices.Count - 1)
         {
@@ -272,22 +351,34 @@ public class Train : MonoBehaviour
         acceleration = 0f;
     }
 
-    public void DrawBogey(int splineIndex, float t)
+    public void AutoDrive()
     {
-        (Vector3 frontBogey, Vector3 rearBogey) = GetBogeyPositions(splineIndex, t);
-        Gizmos.DrawSphere(frontBogey, 1f);
-        Gizmos.DrawSphere(rearBogey, 1f);
-        Gizmos.DrawLine(frontBogey, rearBogey);
+        if (autoDrive && pathFollowing.HasNextStop())
+        {
+            float distanceToTarget = GetDistanceToNextStop();
+            (throttle, brake) = AutoDriveTo(distanceToTarget);
+        }
     }
 
-    protected virtual void OnDrawGizmos()
+    public (float throttle, float brake) AutoDriveTo(float distanceToTarget)
     {
-        // show bogey positions with a straight line between them
-        if (splineManager != null && attached)
+        float stoppingDistance = EstimateStoppingDistance() + GetStoppingDistanceMargin();
+        Debug.Log($"Distance to target: {distanceToTarget}, Stopping distance: {stoppingDistance} (with margin)");
+        if (distanceToTarget <= stoppingDistance)
         {
-            Gizmos.color = Color.green;
-            DrawBogey(attachedTo, currentT);
+            return (0f, 1f);
         }
+        else
+        {
+            return (1f, 0f);
+        }
+    }
+
+    public float GetDistanceToNextStop()
+    {
+        if (!pathFollowing.HasNextStop()) return 0f;
+
+        return splineManager.GetDistanceAlongPath(pathFollowing.GetPathToNextStop(), currentT, pathFollowing.NextStop.stopT);
     }
 
     public virtual float GetEffectiveMass()
@@ -322,6 +413,55 @@ public class Train : MonoBehaviour
         ApplyGravity(attachedTo, currentT);
         ApplyThrottle(attachedTo, currentT);
         ApplyBrake(attachedTo, currentT);
+    }
+
+    public void ApplyStopCondition()
+    {
+        if (brake > 0f && Mathf.Abs(velocity) < brakeStoppingVelocity)
+        {
+            velocity = 0f;
+
+            if (autoDrive)
+            {
+                throttle = 0f;
+                brake = 1f;
+                autoDrive = false;
+            }
+        }
+    }
+
+    public float GetStoppingDistanceMargin()
+    {
+        return (-Mathf.Exp(-Mathf.Abs(velocity)) + 1) * (maxStoppingDistanceMargin - minStoppingDistanceMargin) + minStoppingDistanceMargin;
+    }
+
+    public virtual float GetEffectiveMaxBrake()
+    {
+        return maxBrake;
+    }
+
+    public float EstimateStoppingDistance()
+    {
+        float k = GetEffectiveMaxBrake() / GetEffectiveMass();
+        return (Mathf.Abs(velocity) - brakeStoppingVelocity) / k;
+    }
+
+    protected virtual void OnDrawGizmos()
+    {
+        // show bogey positions with a straight line between them
+        if (splineManager != null && attached)
+        {
+            Gizmos.color = Color.green;
+            DrawBogey(attachedTo, currentT);
+        }
+    }
+
+    public void DrawBogey(int splineIndex, float t)
+    {
+        (Vector3 frontBogey, Vector3 rearBogey) = GetBogeyPositions(splineIndex, t);
+        Gizmos.DrawSphere(frontBogey, 1f);
+        Gizmos.DrawSphere(rearBogey, 1f);
+        Gizmos.DrawLine(frontBogey, rearBogey);
     }
 
     public (Vector3, Vector3) GetBogeyPositions(int splineIndex, float t)
