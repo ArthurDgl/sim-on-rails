@@ -19,25 +19,27 @@ public class PointPlacer : MonoBehaviour
     [SerializeField] private float pickRadiusPixels = 25f;   // click this close to a point to select it
     [SerializeField] private Color selectedColor = Color.red;
     [SerializeField] private float selectedScale = 1.5f;
-    
+    [SerializeField] private bool selectNewPointAfterLink = true;   // lets you keep extending a chain by clicking
+
     [Header("Dragging")]
     [SerializeField] private float dragThresholdPixels = 5f;   // movement needed before a press becomes a drag
+
+    [Header("Spline")]
+    [SerializeField] private SplineManager splineManager;
+    [SerializeField] private int samplesPerSegment = 20;
+    [SerializeField] private float lineWidth = 0.3f;
+    [SerializeField] private Color lineColor = Color.yellow;
+
+    public List<TerrainPoint> Points { get; } = new List<TerrainPoint>();   // every point, all chains
+    public List<PointChain> Chains { get; } = new List<PointChain>();
+    public TerrainPoint Selected { get; private set; }
 
     private TerrainPoint dragged;
     private Vector2 pressScreenPos;
     private bool dragMoved;
 
-    [Header("Spline")]
-    [SerializeField] private SplineManager splineManager;
-    [SerializeField] private LineRenderer lineRenderer;   // optional, created automatically if empty
-    [SerializeField] private int samplesPerSegment = 20;
-    [SerializeField] private float lineWidth = 0.3f;
-    [SerializeField] private Color lineColor = Color.yellow;
-
-    public List<TerrainPoint> Points { get; } = new List<TerrainPoint>();
-    public TerrainPoint Selected { get; private set; }
-
-    private int currentSplineIndex = -1;
+    private int nextChainId;
+    private Material lineMaterial;
 
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor"); // URP / HDRP
     private static readonly int ColorId = Shader.PropertyToID("_Color");         // Built-in
@@ -46,24 +48,6 @@ public class PointPlacer : MonoBehaviour
     private void Awake()
     {
         if (cam == null) cam = Camera.main;
-        if (lineRenderer == null) lineRenderer = CreateLineRenderer();
-    }
-
-    private LineRenderer CreateLineRenderer()
-    {
-        GameObject go = new GameObject("SplineLine");
-        go.transform.SetParent(transform, false);
-
-        LineRenderer lr = go.AddComponent<LineRenderer>();
-        lr.useWorldSpace = true;
-        lr.positionCount = 0;
-        lr.widthMultiplier = lineWidth;
-        lr.numCornerVertices = 4;
-        lr.numCapVertices = 4;
-        lr.material = new Material(Shader.Find("Sprites/Default"));
-        lr.startColor = lineColor;
-        lr.endColor = lineColor;
-        return lr;
     }
 
     private void Update()
@@ -73,8 +57,15 @@ public class PointPlacer : MonoBehaviour
 
         Vector2 screenPos = mouse.position.ReadValue();
 
+        if (mouse.rightButton.wasPressedThisFrame)
+            Select(null);
+
         if (mouse.leftButton.wasPressedThisFrame)
         {
+            // Alt + left mouse is used by the camera to rotate
+            if (Keyboard.current != null && Keyboard.current.leftAltKey.isPressed)
+                return;
+
             // Ignore clicks on UI elements
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
                 return;
@@ -90,7 +81,6 @@ public class PointPlacer : MonoBehaviour
             else
             {
                 dragged = null;
-                Select(null);
                 TryPlacePoint(screenPos);
             }
         }
@@ -112,7 +102,6 @@ public class PointPlacer : MonoBehaviour
         Keyboard kb = Keyboard.current;
         if (kb == null) return;
 
-        if (kb.enterKey.wasPressedThisFrame) BuildSpline();
         if (kb.backspaceKey.wasPressedThisFrame) ClearAll();
         if (kb.deleteKey.wasPressedThisFrame) DeleteSelected();
         if (kb.escapeKey.wasPressedThisFrame) Select(null);
@@ -132,11 +121,31 @@ public class PointPlacer : MonoBehaviour
             // Offset along the surface normal, so it also works on steep slopes
             Vector3 pos = hit.point + hit.normal * heightOffset;
 
-            GameObject marker = Instantiate(pointPrefab, pos, Quaternion.identity, transform);
-            int index = Points.Count;
-            marker.name = $"Point_{index}";
+            bool linkToSelected = Selected != null;
+            PointChain chain;
+            int insertAt;
 
-            Points.Add(new TerrainPoint(index, pos, marker));
+            if (linkToSelected)
+            {
+                // Extend the selected point's chain
+                chain = Selected.chain;
+                int i = chain.points.IndexOf(Selected);
+
+                // First point of a longer chain: extend backwards. Otherwise insert right after it.
+                insertAt = (i == 0 && chain.points.Count > 1) ? 0 : i + 1;
+            }
+            else
+            {
+                // Standalone point: starts its own chain, no spline yet
+                chain = CreateChain();
+                insertAt = 0;
+            }
+
+            TerrainPoint newPoint = CreatePoint(pos, chain, insertAt);
+            RefreshChain(chain);
+
+            if (linkToSelected && selectNewPointAfterLink)
+                Select(newPoint);
         }
         else
         {
@@ -146,6 +155,46 @@ public class PointPlacer : MonoBehaviour
             else
                 Debug.LogWarning("PointPlacer: ray hit no collider at all. Check the terrain has a Terrain Collider with its Terrain Data assigned.");
         }
+    }
+
+    private TerrainPoint CreatePoint(Vector3 pos, PointChain chain, int insertAt)
+    {
+        GameObject marker = Instantiate(pointPrefab, pos, Quaternion.identity, transform);
+
+        TerrainPoint point = new TerrainPoint(0, pos, marker) { chain = chain };
+        chain.points.Insert(insertAt, point);
+        Points.Add(point);
+
+        Reindex(chain);
+        return point;
+    }
+
+    private PointChain CreateChain()
+    {
+        PointChain chain = new PointChain(nextChainId++);
+        chain.line = CreateLineRenderer(chain.id);
+        Chains.Add(chain);
+        return chain;
+    }
+
+    private LineRenderer CreateLineRenderer(int chainId)
+    {
+        if (lineMaterial == null)
+            lineMaterial = new Material(Shader.Find("Sprites/Default"));
+
+        GameObject go = new GameObject($"SplineLine_{chainId}");
+        go.transform.SetParent(transform, false);
+
+        LineRenderer lr = go.AddComponent<LineRenderer>();
+        lr.useWorldSpace = true;
+        lr.positionCount = 0;
+        lr.widthMultiplier = lineWidth;
+        lr.numCornerVertices = 4;
+        lr.numCapVertices = 4;
+        lr.sharedMaterial = lineMaterial;
+        lr.startColor = lineColor;
+        lr.endColor = lineColor;
+        return lr;
     }
 
     // ---------- Selection ----------
@@ -206,6 +255,8 @@ public class PointPlacer : MonoBehaviour
         }
     }
 
+    // ---------- Edit ----------
+
     public void DeleteSelected()
     {
         if (Selected == null) return;
@@ -215,11 +266,21 @@ public class PointPlacer : MonoBehaviour
         TerrainPoint p = Selected;
         Select(null);
 
+        PointChain chain = p.chain;
+
         if (p.marker != null) Destroy(p.marker);
+        chain.points.Remove(p);
         Points.Remove(p);
 
-        Reindex();
-        RefreshSpline();
+        if (chain.points.Count == 0)
+        {
+            RemoveChain(chain);
+        }
+        else
+        {
+            Reindex(chain);
+            RefreshChain(chain);
+        }
     }
 
     private void DragPoint(TerrainPoint p, Vector2 screenPos)
@@ -235,22 +296,24 @@ public class PointPlacer : MonoBehaviour
         p.position = pos;                       // data used by the spline
         p.marker.transform.position = pos;      // visual
 
-        RefreshSpline();                        // live update if a spline already exists
+        RefreshChain(p.chain);                  // live update of this chain's spline
     }
 
-    /// <summary>Keeps index values contiguous (0..n-1) and in sync with the list order.</summary>
-    private void Reindex()
+    /// <summary>Keeps index values contiguous (0..n-1) inside a chain and in sync with its order.</summary>
+    private void Reindex(PointChain chain)
     {
-        for (int i = 0; i < Points.Count; i++)
+        for (int i = 0; i < chain.points.Count; i++)
         {
-            Points[i].index = i;
-            if (Points[i].marker != null) Points[i].marker.name = $"Point_{i}";
+            chain.points[i].index = i;
+            if (chain.points[i].marker != null)
+                chain.points[i].marker.name = $"Chain{chain.id}_Point{i}";
         }
     }
 
-    // ---------- Spline ----------
+    // ---------- Splines ----------
 
-    public void BuildSpline()
+    /// <summary>Creates, updates or removes the spline of a chain, and redraws its line.</summary>
+    private void RefreshChain(PointChain chain)
     {
         if (splineManager == null)
         {
@@ -258,55 +321,75 @@ public class PointPlacer : MonoBehaviour
             return;
         }
 
-        if (Points.Count < 2)
+        // A spline needs at least 2 points
+        if (chain.points.Count < 2)
         {
-            Debug.LogWarning("PointPlacer: need at least 2 points to build a spline.");
+            RemoveChainSpline(chain);
+            if (chain.line != null) chain.line.positionCount = 0;
             return;
         }
 
-        splineManager.ClearSplines();
-        Vector3[] positions = Points.Select(p => p.position).ToArray();
-        currentSplineIndex = splineManager.FromPoints(positions);
+        Vector3[] positions = chain.points.Select(p => p.position).ToArray();
 
-        if (lineRenderer != null)
+        if (chain.splineIndex < 0)
         {
-            int count = (Points.Count - 1) * samplesPerSegment + 1;
-            Vector3[] samples = splineManager.SamplePoints(currentSplineIndex, count);
-            lineRenderer.positionCount = samples.Length;
-            lineRenderer.SetPositions(samples);
-        }
-    }
-
-    /// <summary>Called after the point list changes. Rebuilds the spline only if one was already built.</summary>
-    private void RefreshSpline()
-    {
-        if (currentSplineIndex < 0) return;
-
-        if (Points.Count >= 2)
-        {
-            BuildSpline();
+            chain.splineIndex = splineManager.FromPoints(positions);
         }
         else
         {
-            if (splineManager != null) splineManager.ClearSplines();
-            if (lineRenderer != null) lineRenderer.positionCount = 0;
-            currentSplineIndex = -1;
+            // Spline is a struct, but its points list is a reference: editing it updates the real spline.
+            // This keeps the spline index (and any switch attached to it) unchanged.
+            List<Vector3> splinePoints = splineManager.GetSpline(chain.splineIndex).points;
+            splinePoints.Clear();
+            splinePoints.AddRange(positions);
+        }
+
+        if (chain.line != null)
+        {
+            int count = (chain.points.Count - 1) * samplesPerSegment + 1;
+            Vector3[] samples = splineManager.SamplePoints(chain.splineIndex, count);
+            chain.line.positionCount = samples.Length;
+            chain.line.SetPositions(samples);
         }
     }
 
+    /// <summary>Removes a chain's spline from the SplineManager and fixes the indices of the other chains.</summary>
+    private void RemoveChainSpline(PointChain chain)
+    {
+        if (chain.splineIndex < 0 || splineManager == null) return;
+
+        int removed = chain.splineIndex;
+        splineManager.RemoveSpline(removed);
+        chain.splineIndex = -1;
+
+        // RemoveSpline shifts every later spline down by one
+        foreach (PointChain other in Chains)
+            if (other.splineIndex > removed) other.splineIndex--;
+    }
+
+    private void RemoveChain(PointChain chain)
+    {
+        RemoveChainSpline(chain);
+        if (chain.line != null) Destroy(chain.line.gameObject);
+        Chains.Remove(chain);
+    }
+
+    /// <summary>Deletes every point and every spline created by this placer (other splines are left alone).</summary>
     public void ClearAll()
     {
         Select(null);
-
         dragged = null;
 
         foreach (TerrainPoint p in Points)
             if (p.marker != null) Destroy(p.marker);
 
-        Points.Clear();
+        foreach (PointChain chain in Chains)
+        {
+            RemoveChainSpline(chain);
+            if (chain.line != null) Destroy(chain.line.gameObject);
+        }
 
-        if (splineManager != null) splineManager.ClearSplines();
-        if (lineRenderer != null) lineRenderer.positionCount = 0;
-        currentSplineIndex = -1;
+        Points.Clear();
+        Chains.Clear();
     }
 }
