@@ -20,6 +20,9 @@ public class PointPlacer : MonoBehaviour
     [SerializeField] private LineRenderer lineRenderer;   // optional, to see the spline in the Game view
     [SerializeField] private int samplesPerSegment = 20;
 
+    [SerializeField] private float lineWidth = 0.3f;
+    [SerializeField] private Color lineColor = Color.yellow;
+
     public List<TerrainPoint> Points { get; } = new List<TerrainPoint>();
 
     private int currentSplineIndex = -1;
@@ -27,6 +30,24 @@ public class PointPlacer : MonoBehaviour
     private void Awake()
     {
         if (cam == null) cam = Camera.main;
+        if (lineRenderer == null) lineRenderer = CreateLineRenderer();
+    }
+
+    private LineRenderer CreateLineRenderer()
+    {
+        GameObject go = new GameObject("SplineLine");
+        go.transform.SetParent(transform, false);
+
+        LineRenderer lr = go.AddComponent<LineRenderer>();
+        lr.useWorldSpace = true;
+        lr.positionCount = 0;
+        lr.widthMultiplier = lineWidth;
+        lr.numCornerVertices = 4;
+        lr.numCapVertices = 4;
+        lr.material = new Material(Shader.Find("Sprites/Default"));
+        lr.startColor = lineColor;
+        lr.endColor = lineColor;
+        return lr;
     }
 
     private void Update()
@@ -95,12 +116,14 @@ public class PointPlacer : MonoBehaviour
             return;
         }
 
+        Debug.Log($"PointPlacer: building spline from {Points.Count} points.");
         splineManager.ClearSplines();
         Vector3[] positions = Points.Select(p => p.position).ToArray();
         currentSplineIndex = splineManager.FromPoints(positions);
 
         if (lineRenderer != null)
         {
+            Debug.Log($"PointPlacer: sampling spline for LineRenderer with {samplesPerSegment} samples per segment.");
             int count = (Points.Count - 1) * samplesPerSegment + 1;
             Vector3[] samples = splineManager.SamplePoints(currentSplineIndex, count);
             lineRenderer.positionCount = samples.Length;
