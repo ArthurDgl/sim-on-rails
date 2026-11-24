@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -6,6 +7,7 @@ public class PassengersTests : MonoBehaviour
 {
     public LogicalTrain train;
     public List<TrainStation> stations = new List<TrainStation>();
+    public bool IsAdvancingStation { get; private set; }
 
     void Start()
     {
@@ -27,6 +29,28 @@ public class PassengersTests : MonoBehaviour
         stations[2].containers.Add(new Container(stations[2], stations[0]));
 
         train = new LogicalTrain(stations);
+        StartCoroutine(InitializeTrain());
+    }
+
+    IEnumerator InitializeTrain()
+    {
+        IsAdvancingStation = true;
+        try { yield return train.initialize(); }
+        finally { IsAdvancingStation = false; }
+    }
+
+    public void AdvanceToNextStation()
+    {
+        if (IsAdvancingStation || train == null) return;
+
+        StartCoroutine(AdvanceToNextStationCoroutine());
+    }
+
+    IEnumerator AdvanceToNextStationCoroutine()
+    {
+        IsAdvancingStation = true;
+        try { yield return train.goToNextStation(); }
+        finally { IsAdvancingStation = false; }
     }
 
     void Update()
@@ -45,9 +69,12 @@ public class PassengersTestsEditor : Editor
 
         PassengersTests passengersTests = (PassengersTests)target;
 
-        if (GUILayout.Button("Next Station"))
+        using (new EditorGUI.DisabledScope(!Application.isPlaying || passengersTests.train == null || passengersTests.IsAdvancingStation))
         {
-            passengersTests.train.goToNextStation();
+            if (GUILayout.Button("Next Station"))
+            {
+                passengersTests.AdvanceToNextStation();
+            }
         }
     }
 }

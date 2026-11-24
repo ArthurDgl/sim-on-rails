@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 
 public class Ressource
@@ -20,5 +21,6 @@ public class Ressource
 
     public virtual void onDelivered() {}
     public virtual void onTaken() {}
+    public virtual IEnumerator wait() { yield break; }
 
 }

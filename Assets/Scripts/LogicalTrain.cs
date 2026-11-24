@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -8,7 +9,7 @@ public class LogicalTrain
     private int currentStationIndex = 0;
 
     public List<Ressource> ressources = new List<Ressource>();
-    public int peopleCapacity = 3;
+    public int passengerCapacity = 3;
     public int containerCapacity = 2;
 
     public LogicalTrain(List<TrainStation> stations)
@@ -22,26 +23,30 @@ public class LogicalTrain
         }
 
         currentStation = schedule[0];
-        takeOnRessources();
     }
 
-    public void goToNextStation()
+    public IEnumerator initialize()
     {
-        if (schedule == null || schedule.Count == 0) return;
+        yield return takeOnRessources();
+    }
+
+    public IEnumerator goToNextStation()
+    {
+        if (schedule == null || schedule.Count == 0) yield break;
 
         Debug.Log("Changed station");
         next();
-        dropOffRessources();
-        takeOnRessources();
+        yield return dropOffRessources();
+        yield return takeOnRessources();
     }
 
-    void dropOffRessources()
+    IEnumerator dropOffRessources()
     {
-        dropOff(currentStation.passengers);
-        dropOff(currentStation.containers);
+        yield return dropOff(currentStation.passengers);
+        yield return dropOff(currentStation.containers);
     }
 
-    void dropOff<T>(List<T> ressourceList) where T : Ressource
+    IEnumerator dropOff<T>(List<T> ressourceList) where T : Ressource
     {
         for (int i = ressources.Count - 1; i >= 0; i--)
         {
@@ -51,6 +56,7 @@ public class LogicalTrain
 
             if (r.route[1] == currentStation)
             {
+                yield return r.wait();
                 r.changeStation();
                 ressourceList.Add(r);
                 ressources.RemoveAt(i);
@@ -60,13 +66,13 @@ public class LogicalTrain
         }
     }
 
-    void takeOnRessources()
+    IEnumerator takeOnRessources()
     {
-        takeOn(currentStation.passengers, peopleCapacity);
-        takeOn(currentStation.containers, containerCapacity);
+        yield return takeOn(currentStation.passengers, passengerCapacity);
+        yield return takeOn(currentStation.containers, containerCapacity);
     }
 
-    void takeOn<T>(List<T> ressourceList, int ressourceCapacity) where T : Ressource
+    IEnumerator takeOn<T>(List<T> ressourceList, int ressourceCapacity) where T : Ressource
     {
         int loadedCount = 0;
         foreach (Ressource r in ressources)
@@ -86,6 +92,7 @@ public class LogicalTrain
 
             if (schedule.Contains(r.route[1]))
             {
+                yield return r.wait();
                 ressources.Add(r);
                 ressourceList.RemoveAt(i);
                 loadedCount++;
